@@ -3,99 +3,301 @@
 #include <stack>
 #include <cmath>
 
-struct XBWT::MyImpl {
+struct XBWT::MyImpl
+{
     // TODO: use sdsl to store the XBWT
 };
 
-XBWT::XBWT(const LabeledTree<unsigned int> &tree) {
+XBWT::XBWT(const LabeledTree<unsigned int> &tree)
+{
     createXBWT(tree);
 }
 
 /**
- * @brief 
+ * @brief
  * IntNodes
-        Array of triples, where the first element represents the node 
-        label, the second the level, and the third the position of the 
-        node's parent in this Array. The order of the nodes is established 
+        Array of triples, where the first element represents the node
+        label, the second the level, and the third the position of the
+        node's parent in this Array. The order of the nodes is established
         by the pre-order visit of the T tree..
- * 
- * @param root 
- * @return std::vector<Triplet<unsigned int, int, int>> 
+ *
+ * @param root
+ * @return std::vector<Triplet<unsigned int, int, int>>
  */
-std::vector<Triplet<unsigned int, int, int>> XBWT::computeIntNodes(const Node<unsigned int> &root) {
+std::vector<Triplet<unsigned int, int, int>> XBWT::computeIntNodes(const Node<unsigned int> &root)
+{
     std::vector<Triplet<unsigned int, int, int>> intNodes;
 
     // stack to visit nodes in reorder traversal
-    std::stack<Triplet<const Node<unsigned int>*, int, int>> stack;
-    stack.push(Triplet<const Node<unsigned int>*, int, int>(&root, 0, 0));
+    std::stack<Triplet<const Node<unsigned int> *, int, int>> stack;
+    stack.push(Triplet<const Node<unsigned int> *, int, int>(&root, 0, 0));
 
-    while (!stack.empty()) {
+    while (!stack.empty())
+    {
         auto [node, cur_level, parent_index] = stack.top();
         stack.pop();
         intNodes.push_back(Triplet<unsigned int, int, int>(node->getLabel(), cur_level, parent_index));
-        
+
         // update level and parent index
-        parent_index = intNodes.size() - 1;
+        parent_index = intNodes.size();
         ++cur_level;
 
         // visit children in reverse order
-        for (auto it = node->getChildren().rbegin(); it != node->getChildren().rend(); ++it) {
-            stack.push(Triplet<const Node<unsigned int>*, int, int>(*it, cur_level, parent_index));
+        for (auto it = node->getChildren().rbegin(); it != node->getChildren().rend(); ++it)
+        {
+            stack.push(Triplet<const Node<unsigned int> *, int, int>(*it, cur_level, parent_index));
         }
     }
 
     return intNodes;
 }
 
-void XBWT::pathSort(LabeledTree<unsigned int> &cTree, bool dummyRoot, bool firstIt, unsigned int rem, unsigned int maxName) {
-    auto intNodes = computeIntNodes(*cTree.getRoot());
+LabeledTree<unsigned int> XBWT::contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted)
+{
+    if (tripletsSorted)
+    {
+        unsigned int newName = 2;
+        Triplet<unsigned int, int, int> &preTriplet = tripletsSorted->front().second;
+        for (auto &pair : *tripletsSorted)
+        {
+            if (pair.second.first != preTriplet.first || pair.second.second != preTriplet.second || pair.second.third != preTriplet.third)
+            {
+                preTriplet = pair.second;
+                ++newName;
+            }
 
-    // get number of nodes at level j I {0, 1, 2} mode 3
-    Triplet<unsigned int, unsigned int, unsigned int> nodeLevelCounts = {0, 0, 0};
-    for (const auto &triplet : intNodes) {
-        for (unsigned int i = 0; i < 3; ++i) {
-            ++nodeLevelCounts[triplet.second % 3];
+            intNodes[pair.first].first = newName;
         }
     }
 
+    if (j == 0)
+        intNodes[0].first = 1;
+
+    // create nodes
+    std::vector<Node<unsigned int> *> nodes(intNodes.size(), nullptr);
+    for (unsigned int i = 0; i < intNodes.size(); ++i)
+    {
+        nodes[i] = new Node<unsigned int>(intNodes[i].first);
+    }
+
+    short int jNext[] = {1, 2, 0};
+    std::vector<std::pair<unsigned int, unsigned int>> edges;
+    if (j == 0)
+    {
+        for (int i = intNodes.size() - 1; i >= 0; --i)
+        {
+            auto &it = intNodes[i];
+            if (it.second % 3 != j)
+            {
+                if (it.second % 3 == jNext[j])
+                {
+                    // if the parent is the root
+                    if (it.third == 1)
+                        edges.push_back(std::pair<unsigned int, unsigned int>(it.third - 1, i));
+                    else
+                        edges.push_back(std::pair<unsigned int, unsigned int>(intNodes[it.third - 1].third - 1, i));
+                }
+                else
+                    edges.push_back(std::pair<unsigned int, unsigned int>(it.third - 1, i));
+            }
+        }
+    }
+    else
+    {
+        for (int i = intNodes.size() - 1; i > 0; --i)
+        {
+            auto &it = intNodes[i];
+            if (it.second % 3 != j)
+            {
+                if (it.second % 3 == jNext[j])
+                    edges.push_back(std::pair<unsigned int, unsigned int>(intNodes[it.third - 1].third - 1, i));
+                else
+                    edges.push_back(std::pair<unsigned int, unsigned int>(it.third - 1, i));
+            }
+        }
+    }
+
+    // create tree by adding edges in reverse order
+    for (int i = edges.size() - 1; i >= 0; --i)
+    {
+        nodes[edges[i].first]->addChild(nodes[edges[i].second]);
+    }
+
+    auto tree = LabeledTree<unsigned int>(nodes[0]);
+    std::cout << "Tree: " << tree.toString() << std::endl;
+
+    return LabeledTree<unsigned int>(nodes[0]);
+}
+
+void XBWT::pathSort(const LabeledTree<unsigned int> &cTree, bool dummyRoot, bool firstIt, unsigned int rem)
+{
+    auto intNodes = computeIntNodes(*cTree.getRoot());
+
+    // get number of nodes at level j I {0, 1, 2} mode 3
+    unsigned int nodeLevelCounts[] = {0, 0, 0};
+    for (const auto &triplet : intNodes)
+    {
+        ++nodeLevelCounts[triplet.second % 3];
+    }
+
+    nodeLevelCounts[0] -= rem;
+
     // t/3
     unsigned int x = 0;
-    if (rem > 0) 
+    if (rem > 0)
         x = static_cast<unsigned int>(std::ceil(static_cast<double>(intNodes.size() - rem) / 3.0));
     else
         x = static_cast<unsigned int>(std::ceil(static_cast<double>(intNodes.size()) / 3.0));
 
     // compute j value
-    unsigned int j = -1;
-    for (unsigned int i = 0; i < 3; ++i) {
-        if (nodeLevelCounts[i] >= x) {
+    short int j = -1;
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+        if (nodeLevelCounts[i] >= x)
+        {
             j = i;
             break;
         }
     }
 
     // TODO: remove this
-    if (j == -1) {
+    if (j == -1)
+    {
         std::cerr << "Error: j value not found" << std::endl;
         return;
     }
 
     std::vector<unsigned int> intNodesPosJ(nodeLevelCounts[j], 0);
     std::vector<unsigned int> intNodesPosNotJ(intNodes.size() - nodeLevelCounts[j], 0);
-    for (unsigned int i = 0, k = 0, l = 0; i < intNodes.size(); ++i) {
-        if (intNodes[i].second % 3 == j) {
+    for (unsigned int i = 0, k = 0, l = 0; i < intNodes.size(); ++i)
+    {
+        if (intNodes[i].second % 3 == j)
+        {
             intNodesPosJ[k++] = i;
-        } else {
+        }
+        else
+        {
             intNodesPosNotJ[l++] = i;
         }
     }
 
-    
+    // prepemd intNodes with dummy root if needed (2 or 3 based on j level)
+    short int numDummyNodes = (j != 0) ? 3 : 2;
+    std::vector<Triplet<unsigned int, int, int>> tempIntNodes(intNodes.size() + numDummyNodes, Triplet<unsigned int, int, int>(0, 0, 0));
+    if (j != 0)
+    {
+        tempIntNodes[0] = Triplet<unsigned int, int, int>(0, -3, -1);
+        tempIntNodes[1] = Triplet<unsigned int, int, int>(0, -2, 0);
+        tempIntNodes[2] = Triplet<unsigned int, int, int>(0, -1, 1);
+
+        for (unsigned int i = 0; i < intNodes.size(); ++i)
+        {
+            tempIntNodes[i + numDummyNodes] = intNodes[i];
+            tempIntNodes[i + numDummyNodes].third += numDummyNodes - 1;
+        }
+    }
+    else
+    {
+        tempIntNodes[0] = Triplet<unsigned int, int, int>(0, -2, -1);
+        tempIntNodes[1] = Triplet<unsigned int, int, int>(0, -1, 0);
+
+        for (unsigned int i = 0; i < intNodes.size(); ++i)
+        {
+            tempIntNodes[i + numDummyNodes] = intNodes[i];
+            tempIntNodes[i + numDummyNodes].third += numDummyNodes - 1;
+        }
+    }
+
+    std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> tripletsToSort(intNodesPosNotJ.size(), std::pair<unsigned int, Triplet<unsigned int, int, int>>(0, Triplet<unsigned int, int, int>(0, 0, 0)));
+    bool areAllEqual = true;
+    for (unsigned int i = 0; i < intNodesPosNotJ.size(); ++i)
+    {
+        auto index = intNodesPosNotJ[i] + numDummyNodes;
+        tripletsToSort[i].first = intNodesPosNotJ[i];
+
+        tripletsToSort[i].second.first = tempIntNodes[tempIntNodes[index].third].first;
+        index = tempIntNodes[index].third;
+
+        tripletsToSort[i].second.second = tempIntNodes[tempIntNodes[index].third].first;
+        index = tempIntNodes[index].third;
+
+        tripletsToSort[i].second.third = tempIntNodes[tempIntNodes[index].third].first;
+
+        if (areAllEqual && (tripletsToSort[i].second.first != tripletsToSort[0].second.first || tripletsToSort[i].second.second != tripletsToSort[0].second.second || tripletsToSort[i].second.third != tripletsToSort[0].second.third))
+        {
+            areAllEqual = false;
+        }
+    }
+
+    radixSort(tripletsToSort);
+    if (!areAllEqual)
+    {
+        LabeledTree<unsigned int> cTree;
+        if (firstIt)
+            cTree = contractTree(intNodes, j, &tripletsToSort);
+        else
+            cTree = contractTree(intNodes, j);
+
+        ++rem;
+        if (j == 0)
+            pathSort(cTree, true, false, rem);
+        else
+            pathSort(cTree, false, false, rem);
+    }
+    else
+    {
+    }
 }
 
-void XBWT::createXBWT(const LabeledTree<unsigned int> &tree) {
-    std::vector<Triplet<unsigned int, int, int>> intNodes = computeIntNodes(*tree.getRoot());
-    for (const auto &triplet : intNodes) {
-        std::cout << triplet.first << " " << triplet.second << " " << triplet.third << std::endl;
+void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr)
+{
+    auto countSort = [](std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr, unsigned int exp)
+    {
+        std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> output(arr.size(), std::pair<unsigned int, Triplet<unsigned int, int, int>>(0, Triplet<unsigned int, int, int>(0, 0, 0)));
+        std::vector<unsigned int> count(10, 0);
+
+        for (const auto &pair : arr)
+        {
+            unsigned int val = std::stoi(pair.second.join(""));
+            ++count[(val / exp) % 10];
+        }
+
+        for (unsigned int i = 1; i < 10; ++i)
+        {
+            count[i] += count[i - 1];
+        }
+
+        for (int i = arr.size() - 1; i >= 0; --i)
+        {
+            unsigned int val = std::stoi(arr[i].second.join(""));
+            output[count[(val / exp) % 10] - 1] = arr[i];
+            --count[(val / exp) % 10];
+        }
+
+        for (unsigned int i = 0; i < arr.size(); ++i)
+        {
+            arr[i] = output[i];
+        }
+    };
+
+    // TODO: check if this is vali for big integers
+    unsigned int max = std::stoi(arr[0].second.join(""));
+    for (const auto &el : arr)
+    {
+        unsigned int val = std::stoi(el.second.join(""));
+        if (val > max)
+        {
+            max = val;
+        }
     }
+
+    for (unsigned int exp = 1; max / exp > 0; exp *= 10)
+    {
+        countSort(arr, exp);
+    }
+}
+
+void XBWT::createXBWT(const LabeledTree<unsigned int> &tree)
+{
+    pathSort(tree);
 }

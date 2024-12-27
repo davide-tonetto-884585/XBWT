@@ -79,6 +79,12 @@ public:
         auto child = new Node(lbl, this);
         children.push_back(child);
     }
+
+    void addChild(Node *child)
+    {
+        child->parent = this;
+        children.push_back(child);
+    }
 };
 
 template <typename LabelType>
@@ -88,6 +94,8 @@ private:
     Node<LabelType> *root;
 
 public:
+    LabeledTree() : root(nullptr) {}
+
     LabeledTree(LabelType rootLabel)
     {
         root = new Node<LabelType>(rootLabel);
@@ -96,6 +104,14 @@ public:
     LabeledTree(const std::string &str)
     {
         root = fromString(str);
+    }
+
+    LabeledTree(Node<LabelType> *root) : root(root) {}
+
+    LabeledTree(const LabeledTree &other)
+    {
+        // recursively copy the tree
+        root = copyTree(other.root);
     }
 
     ~LabeledTree()
@@ -123,6 +139,20 @@ public:
     }
 
 private:
+    Node<LabelType> *copyTree(Node<LabelType> *node)
+    {
+        if (!node)
+            return nullptr;
+
+        auto newNode = new Node<LabelType>(node->getLabel());
+        for (const auto &child : node->getChildren())
+        {
+            newNode->addChild(copyTree(child));
+        }
+
+        return newNode;
+    }
+
     Node<LabelType> *fromString(const std::string &str)
     {
         std::stack<Node<LabelType> *> nodeStack;
