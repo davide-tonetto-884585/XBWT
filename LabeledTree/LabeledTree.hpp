@@ -119,9 +119,27 @@ public:
         delete root;
     }
 
+    LabeledTree &operator=(const LabeledTree &other)
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        delete root;
+        root = copyTree(other.root);
+
+        return *this;
+    }
+
     Node<LabelType> *getRoot() const
     {
         return root;
+    }
+
+    void setRoot(Node<LabelType> *newRoot)
+    {
+        root = newRoot;
     }
 
     std::vector<Node<LabelType> *> getNodes() const
@@ -142,8 +160,10 @@ private:
     Node<LabelType> *copyTree(Node<LabelType> *node)
     {
         if (!node)
+        {
             return nullptr;
-
+        }
+        
         auto newNode = new Node<LabelType>(node->getLabel());
         for (const auto &child : node->getChildren())
         {
@@ -205,7 +225,7 @@ private:
     {
         if (!node)
             return;
-        
+
         oss << '(';
         oss << node->getLabel();
         if (!node->isLeaf())
