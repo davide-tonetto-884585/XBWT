@@ -3,16 +3,24 @@
 #include <stack>
 #include <cmath>
 #include <algorithm>
+#include <sdsl/bit_vectors.hpp>
+#include <sdsl/wavelet_trees.hpp>
+#include <sdsl/int_vector.hpp>
 
 struct XBWT::MyImpl
 {
-    // TODO: use sdsl to store the XBWT
+    sdsl::rrr_vector<> SLastCompressed;
+    sdsl::rrr_vector<> SAlphaBitCompressed;
+    sdsl::wt_int<sdsl::rrr_vector<>> SAlphaCompressed;
 };
 
-XBWT::XBWT(const LabeledTree<unsigned int> &tree)
+XBWT::XBWT(const LabeledTree<unsigned int> &tree, bool verbose)
 {
-    createXBWT(tree);
+    pImpl = std::make_unique<MyImpl>();
+    createXBWT(tree, verbose);
 }
+
+XBWT::~XBWT() = default;
 
 void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr)
 {
@@ -112,11 +120,11 @@ Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, in
         intNodes[0].first = 1;
 
     // create nodes
-    std::vector<Node<unsigned int> *> nodes(intNodes.size(), nullptr);
+    /*std::vector<Node<unsigned int> *> nodes(intNodes.size(), nullptr);
     for (unsigned int i = 0; i < intNodes.size(); ++i)
     {
         nodes[i] = new Node<unsigned int>(intNodes[i].first);
-    }
+    }*/
 
     short int jNext[] = {1, 2, 0};
     std::vector<std::pair<unsigned int, unsigned int>> edges;
@@ -156,8 +164,15 @@ Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, in
     }
 
     // create tree by adding edges in reverse order
+    std::vector<Node<unsigned int> *> nodes(intNodes.size(), nullptr);
     for (int i = edges.size() - 1; i >= 0; --i)
     {
+        if (nodes[edges[i].first] == nullptr)
+            nodes[edges[i].first] = new Node<unsigned int>(intNodes[edges[i].first].first);
+
+        if (nodes[edges[i].second] == nullptr)
+            nodes[edges[i].second] = new Node<unsigned int>(intNodes[edges[i].second].first);
+
         nodes[edges[i].first]->addChild(nodes[edges[i].second]);
     }
 
@@ -510,7 +525,7 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree,
     return pathSortMerge(intNodesPosNotJSorted, intNodesPosJSorted, tempIntNodes, numDummyNodes, j, dummyRoot, firstIt);
 }
 
-void XBWT::createXBWT(const LabeledTree<unsigned int> &tree)
+void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
 {
     std::vector<Triplet<unsigned int, int, int>> intNodes;
     auto posIntNodesSorted = pathSort(tree, &intNodes);
@@ -530,25 +545,38 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree)
             _SLast[i] = true;
     }
 
-    bool *SLast = new bool[intNodes.size()];
-    unsigned int *SAlpha = new unsigned int[intNodes.size()];
-    bool *SAlphaBit = new bool[intNodes.size()];
+    sdsl::bit_vector SLast(intNodes.size());
+    sdsl::int_vector<> tempSAlpha(intNodes.size());
+    sdsl::bit_vector SAlphaBit(intNodes.size());
     unsigned int cont = 0;
     for (unsigned int i : posIntNodesSorted)
     {
         SLast[cont] = _SLast[i];
-        SAlpha[cont] = intNodes[i].first;
+        tempSAlpha[cont] = intNodes[i].first;
         SAlphaBit[cont] = _SAlphaBit[i];
         ++cont;
     }
 
-    // print
-    for (unsigned int i = 0; i < intNodes.size(); ++i)
-    {
-        std::cout << "(" << (SLast[i] ? "1" : "0") << ", " << SAlpha[i] << ", " << (SAlphaBit[i] ? "1" : "0") << ") " << std::endl;
-    }
+    // Compress the bit vectors
+    pImpl->SLastCompressed = sdsl::rrr_vector<>(SLast);
+    pImpl->SAlphaBitCompressed = sdsl::rrr_vector<>(SAlphaBit);
 
-    delete[] SLast;
-    delete[] SAlpha;
-    delete[] SAlphaBit;
+    // Create the wavelet tree
+    sdsl::construct_im(pImpl->SAlphaCompressed, tempSAlpha);
+
+    if (verbose)
+    {
+        // print
+        for (unsigned int i = 0; i < intNodes.size(); ++i)
+        {
+            std::cout << "(" << (pImpl->SLastCompressed[i] ? "1" : "0") << ", " << pImpl->SAlphaCompressed[i] << ", " << (pImpl->SAlphaBitCompressed[i] ? "1" : "0") << ") " << std::endl;
+        }
+
+        std::cout << "SLast size: " << sdsl::size_in_bytes(SLast) << " B" << std::endl;
+        std::cout << "SLast compressed size: " << sdsl::size_in_bytes(pImpl->SLastCompressed) << " B" << std::endl;
+        std::cout << "SAlpha size: " << sdsl::size_in_bytes(tempSAlpha) << " B" << std::endl;
+        std::cout << "SAlpha compressed size: " << sdsl::size_in_bytes(pImpl->SAlphaCompressed) << " B" << std::endl;
+        std::cout << "SAlphaBit size: " << sdsl::size_in_bytes(SAlphaBit) << " B" << std::endl;
+        std::cout << "SAlphaBit compressed size: " << sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) << " B" << std::endl;
+    }
 }

@@ -21,3 +21,12 @@ target_link_libraries(XBWT PRIVATE XBWT_lib)
 
 # Link the LabeledTree library to the executable
 target_link_libraries(XBWT PRIVATE LabeledTree_lib)
+
+target_link_libraries(XBWT PRIVATE sdsl)
+
+# Enable testing
+enable_testing()
+
+# Add a test using Valgrind
+add_test(NAME memcheck
+         COMMAND valgrind --leak-check=full --error-exitcode=1 $<TARGET_FILE:XBWT>)

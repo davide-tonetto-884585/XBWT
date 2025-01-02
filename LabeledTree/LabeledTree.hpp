@@ -7,6 +7,7 @@
 #include <string>
 #include <stack>
 #include <sstream>
+#include <iostream>
 
 template <typename LabelType>
 class Node
@@ -20,11 +21,9 @@ public:
     Node(LabelType lbl, Node *prnt = nullptr, std::vector<Node *> children = {}) : label(lbl), parent(prnt), children(children) {}
 
     ~Node()
-    {
+    {        
         for (auto child : children)
-        {
             delete child;
-        }
     }
 
     bool isRoot() const

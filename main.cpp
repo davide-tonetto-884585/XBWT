@@ -94,7 +94,7 @@ int main() {
     cout << "Tree: " << tree.toString() << endl;
 
     // build an XBWT
-    XBWT xbwt(tree);
+    XBWT xbwt(tree, true);
 
     return 0;
 }
