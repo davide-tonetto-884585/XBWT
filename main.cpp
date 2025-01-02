@@ -2,40 +2,87 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <algorithm>
 
 #include "LabeledTree/LabeledTree.hpp"
 #include "XBWT/XBWT.hpp"
 
 using namespace std;
 
+std::map<std::string, unsigned int> labelToInt(std::vector<std::string> &labels)
+{
+    std::map<std::string, unsigned int> labelMap;
+
+    // sort the labels
+    std::sort(labels.begin(), labels.end());
+
+    unsigned int currentInt = 1;
+    for (const std::string &label : labels)
+    {
+        if (labelMap.find(label) == labelMap.end())
+        {
+            labelMap[label] = currentInt++;
+        }
+    }
+
+    return labelMap;
+}
+
+std::vector<std::string> getLabels(const std::string &str)
+{
+    std::vector<std::string> labels;
+    std::string label = "";
+    for (char ch : str)
+    {
+        if (ch == '(' or ch == ')')
+        {
+            if (label.empty())
+                continue;
+            
+            // add the label to the vector if it is not already present
+            if (std::find(labels.begin(), labels.end(), label) == labels.end())
+            {
+                labels.push_back(label);
+            }
+
+            label = "";
+        }
+        else 
+        {
+            label += ch;
+        }
+    }
+
+    return labels;
+}
+
 int main() {
     // Stringa di input
     std::string str = "(A(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b))))";
     cout << "Input string: " << str << endl;
 
-    // Mappa per convertire le lettere in interi
-    std::map<char, unsigned int> letterToInt;
-    unsigned int currentInt = 1;
+    std::vector<std::string> labels = getLabels(str);
 
-    // Popola la mappa con le lettere presenti nella stringa
-    for (char ch : str) {
-        if (isalpha(ch) && letterToInt.find(ch) == letterToInt.end()) {
-            letterToInt[ch] = currentInt++;
-        }
-    }
+    // Converte la stringa in una stringa di interi
+    std::map<std::string, unsigned int> labelToIntMap = labelToInt(labels);
 
-    // Stampa la mappa per verificare la conversione
-    for (const auto& pair : letterToInt) {
+    // Stampa la mappa
+    std::cout << "Label to int map: " << std::endl;
+    for (const auto &pair : labelToIntMap)
+    {
         std::cout << pair.first << " -> " << pair.second << std::endl;
     }
 
-    // Converti la stringa utilizzando la mappa
-    std::string convertedStr;
-    for (char ch : str) {
-        if (isalpha(ch)) {
-            convertedStr += std::to_string(letterToInt[ch]);
-        } else {
+    std::string convertedStr = "";
+    for (char ch : str)
+    {
+        if (ch == '(' or ch == ')')
+        {
             convertedStr += ch;
+        }
+        else
+        {
+            convertedStr += std::to_string(labelToIntMap[std::string(1, ch)]);
         }
     }
 
