@@ -29,4 +29,4 @@ enable_testing()
 
 # Add a test using Valgrind
 add_test(NAME memcheck
-         COMMAND valgrind --leak-check=full --error-exitcode=1 $<TARGET_FILE:XBWT>)
+    COMMAND valgrind --leak-check=full --error-exitcode=1 $<TARGET_FILE:XBWT>)
