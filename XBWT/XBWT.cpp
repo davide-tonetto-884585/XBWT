@@ -10,19 +10,24 @@
 struct XBWT::MyImpl
 {
     sdsl::rrr_vector<> SLastCompressed;
-    sdsl::rrr_vector<> SAlphaBitCompressed;
     sdsl::wt_int<sdsl::rrr_vector<>> SAlphaCompressed;
+    sdsl::rrr_vector<> SAlphaBitCompressed;
+    sdsl::rrr_vector<> ACompressed;
+    unsigned int cardSigma;
+    unsigned int cardSigmaN;
 };
 
-XBWT::XBWT(const LabeledTree<unsigned int> &tree, bool verbose)
+XBWT::XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsigned int cardSigmaN, bool verbose)
 {
     pImpl = std::make_unique<MyImpl>();
+    pImpl->cardSigma = cardSigma;
+    pImpl->cardSigmaN = cardSigmaN;
     createXBWT(tree, verbose);
 }
 
 XBWT::~XBWT() = default;
 
-void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr)
+void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const
 {
     auto countSort = [](std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr, unsigned int exp)
     {
@@ -53,7 +58,7 @@ void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, i
         }
     };
 
-    // TODO: check if this is vali for big integers
+    // TODO: check if this is valid for big integers
     unsigned int max = std::stoi(arr[0].second.join(""));
     for (const auto &el : arr)
     {
@@ -70,7 +75,7 @@ void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, i
     }
 }
 
-std::vector<Triplet<unsigned int, int, int>> XBWT::computeIntNodes(const Node<unsigned int> &root)
+std::vector<Triplet<unsigned int, int, int>> XBWT::computeIntNodes(const Node<unsigned int> &root) const
 {
     std::vector<Triplet<unsigned int, int, int>> intNodes;
 
@@ -98,7 +103,7 @@ std::vector<Triplet<unsigned int, int, int>> XBWT::computeIntNodes(const Node<un
     return intNodes;
 }
 
-Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted)
+Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted) const
 {
     if (tripletsSorted)
     {
@@ -182,7 +187,7 @@ Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, in
     return nodes[0];
 }
 
-std::vector<unsigned int> XBWT::pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot, bool firstIt)
+std::vector<unsigned int> XBWT::pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot, bool firstIt) const
 {
     std::vector<unsigned int> merged(intNodesPosNotJSorted.size() + intNodesPosJSorted.size(), 0);
     short int jCond[] = {1, 2, 0};
@@ -315,7 +320,7 @@ std::vector<unsigned int> XBWT::pathSortMerge(std::vector<unsigned int> &intNode
     return merged;
 }
 
-std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree, std::vector<Triplet<unsigned int, int, int>> *intNodes, bool dummyRoot, bool firstIt, unsigned int rem)
+std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree, std::vector<Triplet<unsigned int, int, int>> *intNodes, bool dummyRoot, bool firstIt, unsigned int rem) const
 {
     std::vector<Triplet<unsigned int, int, int>> localIntNodes;
     if (intNodes == nullptr)
@@ -563,19 +568,24 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
 
     sdsl::bit_vector SLast(intNodes.size());
     sdsl::int_vector<> tempSAlpha(intNodes.size());
-    sdsl::bit_vector SAlphaBit(intNodes.size());
+    sdsl::bit_vector SAlphaBit(intNodes.size()); // SAlphaBit[i] = 1 iff the corresponding label is a leaf label
+    sdsl::bit_vector A(intNodes.size()); // A[1] = 1, A[j] = 1 iff the first symbol of Sπ[j] differs from the first symbol of Sπ[j − 1]
     unsigned int cont = 0;
+    unsigned int prev_label = 0;
     for (unsigned int i : posIntNodesSorted)
     {
         SLast[cont] = _SLast[i];
         tempSAlpha[cont] = intNodes[i].first;
         SAlphaBit[cont] = _SAlphaBit[i];
+        A[cont] = (cont == 0) ? 1 : (intNodes[intNodes[i].third - 1].first != prev_label);
+        prev_label = intNodes[intNodes[i].third - 1].first;
         ++cont;
     }
 
     // Compress the bit vectors
     pImpl->SLastCompressed = sdsl::rrr_vector<>(SLast);
     pImpl->SAlphaBitCompressed = sdsl::rrr_vector<>(SAlphaBit);
+    pImpl->ACompressed = sdsl::rrr_vector<>(A);
 
     // Create the wavelet tree
     sdsl::construct_im(pImpl->SAlphaCompressed, tempSAlpha);
@@ -583,9 +593,10 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
     if (verbose)
     {
         // print
+        std::cout << "(SLast, SAlpha, SAlphaBit, A) " << std::endl;
         for (unsigned int i = 0; i < intNodes.size(); ++i)
         {
-            std::cout << "(" << (pImpl->SLastCompressed[i] ? "1" : "0") << ", " << pImpl->SAlphaCompressed[i] << ", " << (pImpl->SAlphaBitCompressed[i] ? "1" : "0") << ") " << std::endl;
+            std::cout << "(" << (pImpl->SLastCompressed[i] ? "1" : "0") << ", " << pImpl->SAlphaCompressed[i] << ", " << (pImpl->SAlphaBitCompressed[i] ? "1" : "0") << ", " << pImpl->ACompressed[i] << ") " << std::endl;
         }
 
         std::cout << "SLast size: " << sdsl::size_in_bytes(SLast) << " B" << std::endl;
@@ -594,5 +605,42 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
         std::cout << "SAlpha compressed size: " << sdsl::size_in_bytes(pImpl->SAlphaCompressed) << " B" << std::endl;
         std::cout << "SAlphaBit size: " << sdsl::size_in_bytes(SAlphaBit) << " B" << std::endl;
         std::cout << "SAlphaBit compressed size: " << sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) << " B" << std::endl;
+        std::cout << "A size: " << sdsl::size_in_bytes(A) << " B" << std::endl;
+        std::cout << "A compressed size: " << sdsl::size_in_bytes(pImpl->ACompressed) << " B" << std::endl;
     }
+}
+
+std::vector<unsigned int> XBWT::buildF() const
+{
+    std::vector<unsigned int> C(pImpl->cardSigma, 0);
+    for (unsigned int i = 0; i < pImpl->SLastCompressed.size(); ++i)
+        ++C[pImpl->SAlphaCompressed[i] - 1];
+
+    std::vector<unsigned int> F(pImpl->cardSigmaN, 0);
+    F[0] = 1;
+    // iter internal labels cardinality
+    for (unsigned int i = 0; i < pImpl->cardSigmaN; ++i)
+    {
+        unsigned int s = 0, j = F[i];
+        while (s != C[i])
+        {
+            if (pImpl->SLastCompressed[j++] == 1)
+                ++s;
+        }
+        
+        F[i + 1] = j;
+    }
+
+    return F;
+}
+
+LabeledTree<unsigned int> XBWT::rebuildTree() const
+{
+    auto F = buildF();
+    for (unsigned int i = 0; i < F.size(); ++i)
+    {
+        std::cout << "F[" << i << "] = " << F[i] << std::endl;
+    }
+
+    return LabeledTree<unsigned int>();
 }

@@ -28,16 +28,28 @@ private:
     struct MyImpl;
     std::unique_ptr<MyImpl> pImpl;
 
+    // private methods for building the XBWT
     void createXBWT(const LabeledTree<unsigned int> &tree, bool verbose = false);
-    std::vector<unsigned int> pathSort(const LabeledTree<unsigned int> &cTree, std::vector<Triplet<unsigned int, int, int>> *intNodes = nullptr, bool dummyRoot = false, bool firstIt = true, unsigned int rem = 0);
-    std::vector<unsigned int> pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot = false, bool firstIt = false);
-    Node<unsigned int> *contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted = nullptr);
-    std::vector<Triplet<unsigned int, int, int>> computeIntNodes(const Node<unsigned int> &root);
+    std::vector<unsigned int> pathSort(const LabeledTree<unsigned int> &cTree, std::vector<Triplet<unsigned int, int, int>> *intNodes = nullptr, bool dummyRoot = false, bool firstIt = true, unsigned int rem = 0) const;
+    std::vector<unsigned int> pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot = false, bool firstIt = false) const;
+    Node<unsigned int> *contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted = nullptr) const;
+    std::vector<Triplet<unsigned int, int, int>> computeIntNodes(const Node<unsigned int> &root) const;
 
-    void radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr);
+    // private methods for inverting the XBWT transform
+    std::vector<unsigned int> buildF() const;
+    std::vector<unsigned int> buildJ(std::vector<unsigned int> &F) const;
+
+    // utility methods
+    void radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const;
+
 public:
-    XBWT(const LabeledTree<unsigned int> &tree, bool verbose = false);
+    XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsigned int cardSigmaN, bool verbose = false);
     ~XBWT();
+
+    // rebuild tree
+    LabeledTree<unsigned int> rebuildTree() const;
+
+    // navigation methods
 };
 
 #endif // XBWT_HPP
