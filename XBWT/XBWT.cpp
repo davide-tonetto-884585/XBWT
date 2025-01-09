@@ -9,10 +9,14 @@
 
 struct XBWT::MyImpl
 {
-    sdsl::rrr_vector<> SLastCompressed;
-    sdsl::wt_int<sdsl::rrr_vector<>> SAlphaCompressed;
+    sdsl::rrr_vector<> SLastCompressed;                // operator[] has complexity O(k), where k is a small constant.
+    sdsl::wt_int<sdsl::rrr_vector<>> SAlphaCompressed; // operator[] has complexity O(log |Σ|), where |Σ| denotes the size of the alphabet
     sdsl::rrr_vector<> SAlphaBitCompressed;
     sdsl::rrr_vector<> ACompressed;
+    sdsl::rrr_vector<>::rank_1_type SLastCompressedRank;
+    sdsl::rrr_vector<>::select_1_type SLastCompressedSelect;
+    sdsl::rrr_vector<>::rank_1_type ACompressedRank;
+    sdsl::rrr_vector<>::select_1_type ACompressedSelect;
     unsigned int cardSigma;
     unsigned int cardSigmaN;
 };
@@ -569,7 +573,7 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
     sdsl::bit_vector SLast(intNodes.size());
     sdsl::int_vector<> tempSAlpha(intNodes.size());
     sdsl::bit_vector SAlphaBit(intNodes.size()); // SAlphaBit[i] = 1 iff the corresponding label is a leaf label
-    sdsl::bit_vector A(intNodes.size()); // A[1] = 1, A[j] = 1 iff the first symbol of Sπ[j] differs from the first symbol of Sπ[j − 1]
+    sdsl::bit_vector A(intNodes.size());         // A[1] = 1, A[j] = 1 iff the first symbol of Sπ[j] differs from the first symbol of Sπ[j − 1]
     unsigned int cont = 0;
     unsigned int prev_label = 0;
     for (unsigned int i : posIntNodesSorted)
@@ -577,7 +581,7 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
         SLast[cont] = _SLast[i];
         tempSAlpha[cont] = intNodes[i].first;
         SAlphaBit[cont] = _SAlphaBit[i];
-        A[cont] = (cont == 0) ? 1 : (intNodes[intNodes[i].third - 1].first != prev_label);
+        A[cont] = (cont == 0) ? 0 : (intNodes[intNodes[i].third - 1].first != prev_label); // TODO: in paper A[0] = 1 but it should be 0
         prev_label = intNodes[intNodes[i].third - 1].first;
         ++cont;
     }
@@ -586,6 +590,12 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
     pImpl->SLastCompressed = sdsl::rrr_vector<>(SLast);
     pImpl->SAlphaBitCompressed = sdsl::rrr_vector<>(SAlphaBit);
     pImpl->ACompressed = sdsl::rrr_vector<>(A);
+
+    // add rank and select support
+    pImpl->SLastCompressedRank = sdsl::rrr_vector<>::rank_1_type(&pImpl->SLastCompressed);
+    pImpl->SLastCompressedSelect = sdsl::rrr_vector<>::select_1_type(&pImpl->SLastCompressed);
+    pImpl->ACompressedRank = sdsl::rrr_vector<>::rank_1_type(&pImpl->ACompressed);
+    pImpl->ACompressedSelect = sdsl::rrr_vector<>::select_1_type(&pImpl->ACompressed);
 
     // Create the wavelet tree
     sdsl::construct_im(pImpl->SAlphaCompressed, tempSAlpha);
@@ -627,14 +637,14 @@ std::vector<unsigned int> XBWT::buildF() const
             if (pImpl->SLastCompressed[j++] == 1)
                 ++s;
         }
-        
+
         F[i + 1] = j;
     }
 
     return F;
 }
 
-std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const 
+std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const
 {
     std::vector<long int> J(pImpl->SLastCompressed.size(), 0);
     for (unsigned int i = 0; i < J.size(); ++i)
@@ -659,14 +669,15 @@ LabeledTree<unsigned int> XBWT::rebuildTree() const
     auto F = buildF();
     for (unsigned int i = 0; i < F.size(); ++i)
     {
-        std::cout << "F[" << i << "] = " << F[i] << std::endl;
+        std::cout << "F[" << i << "] = " << F[i] << ", ";
     }
+    std::cout << std::endl;
 
     auto J = buildJ(F);
-    for (unsigned int i = 0; i < J.size(); ++i)
+    /* for (unsigned int i = 0; i < J.size(); ++i)
     {
         std::cout << "J[" << i << "] = " << J[i] << std::endl;
-    }
+    } */
 
     Node<unsigned int> *root = new Node<unsigned int>(pImpl->SAlphaCompressed[0]);
     std::stack<std::pair<unsigned int, Node<unsigned int> *>> Q;
@@ -676,7 +687,8 @@ LabeledTree<unsigned int> XBWT::rebuildTree() const
         auto [i, u] = Q.top();
         Q.pop();
         long int j = J[i];
-        if (j == -1) continue;
+        if (j == -1)
+            continue;
 
         // find first j' >= j such that SLast[j'] = 1
         unsigned int j1 = j;
@@ -688,9 +700,102 @@ LabeledTree<unsigned int> XBWT::rebuildTree() const
             Node<unsigned int> *v = new Node<unsigned int>(pImpl->SAlphaCompressed[h]);
             u->prependChild(v);
             Q.push({h, v});
-        } 
+        }
     }
 
-
     return LabeledTree<unsigned int>(root);
+}
+
+std::pair<long int, long int> XBWT::getChildren(unsigned int i) const
+{
+    if (i >= pImpl->SLastCompressed.size() || i < 0)
+        throw std::runtime_error("Error: index out of bounds");
+
+    if (pImpl->SAlphaBitCompressed[i] == 1)
+        return {-1, -1};
+
+    unsigned int c = pImpl->SAlphaCompressed[i];
+    unsigned int r = pImpl->SAlphaCompressed.rank(i + 1, c);
+    unsigned int y = pImpl->ACompressedSelect(c); // F[c]
+    unsigned int z = pImpl->SLastCompressedRank(y);
+
+    long int first = 0;
+    if (z + r - 1 < 1) // TODO: their pseudocode seems to be wrong for i = 0...
+        first = 1;
+    else
+        first = pImpl->SLastCompressedSelect(z + r - 1) + 1;
+
+    long int last = pImpl->SLastCompressedSelect(z + r);
+
+    return {first, last};
+}
+
+long int XBWT::getRankedChild(unsigned int i, unsigned int k) const
+{
+    if (i >= pImpl->SLastCompressed.size() || i < 0)
+        throw std::runtime_error("Error: index out of bounds");
+
+    if (k < 1)
+        throw std::runtime_error("Error: k must be greater than 0");
+
+    auto [first, last] = getChildren(i);
+    if (k > last - first + 1)
+        return -1;
+    else
+        return first + k - 1;
+}
+
+long int XBWT::getCharRankedChild(unsigned int i, unsigned int c, unsigned int k) const
+{
+    if (i >= pImpl->SLastCompressed.size() || i < 0)
+        throw std::runtime_error("Error: index out of bounds");
+
+    if (k < 1)
+        throw std::runtime_error("Error: k must be greater than 0");
+    
+    auto [first, last] = getChildren(i);
+    unsigned int y1 = pImpl->SAlphaCompressed.rank(first, c);
+    unsigned int y2 = pImpl->SAlphaCompressed.rank(last + 1, c);
+    if (k > y2 - y1)
+        return -1;
+    else
+        return pImpl->SAlphaCompressed.select(y1 + k, c);
+}
+
+long int XBWT::getParent(unsigned int i) const
+{
+    if (i >= pImpl->SLastCompressed.size() || i < 0)
+        throw std::runtime_error("Error: index out of bounds");
+
+    if (i == 0)
+        return -1;
+
+    unsigned int c = pImpl->ACompressedRank(i + 1);
+    unsigned int y = pImpl->ACompressedSelect(c);
+    unsigned int k = pImpl->SLastCompressedRank(i) - pImpl->SLastCompressedRank(y);
+    return pImpl->SAlphaCompressed.select(k + 1, c);
+}
+
+std::pair<long int, long int> XBWT::subPathSearch(const std::string &subPath) const
+{
+    unsigned int first = pImpl->ACompressedSelect(subPath[0] - '0');
+    unsigned int last = pImpl->ACompressedSelect(subPath[0] - '0' + 1) - 1;
+    if (first > last)
+        return {-1, -1};
+    
+    for (unsigned int i = 1; i < subPath.size(); ++i)
+    {
+        unsigned int label = subPath[i] - '0';
+        unsigned int k1 = pImpl->SAlphaCompressed.rank(first, label);
+        unsigned int k2 = pImpl->SAlphaCompressed.rank(last + 1, label);
+        unsigned int z1 = pImpl->SAlphaCompressed.select(k1 + 1, label);
+        unsigned int z2 = pImpl->SAlphaCompressed.select(k2, label);
+        if (z1 > z2)
+            return {-1, -1};
+
+        first = getRankedChild(z1, 1);
+        last = getChildren(z2).second;
+    }
+
+    return {first, last};
 }

@@ -39,6 +39,9 @@ private:
     std::vector<unsigned int> buildF() const;
     std::vector<long int> buildJ(std::vector<unsigned int> &F) const;
 
+    // private methods for navigating the XBWT
+
+
     // utility methods
     void radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const;
 
@@ -50,6 +53,13 @@ public:
     LabeledTree<unsigned int> rebuildTree() const;
 
     // navigation methods
+    std::pair<long int, long int> getChildren(unsigned int i) const;
+    long int getRankedChild(unsigned int i, unsigned int k) const;
+    long int getCharRankedChild(unsigned int i, unsigned int c, unsigned int k) const; // TODO: change c to string/char
+    long int getParent(unsigned int i) const;
+
+    // tree search methods
+    std::pair<long int, long int> subPathSearch(const std::string &subPath) const;
 };
 
 #endif // XBWT_HPP

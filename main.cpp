@@ -116,5 +116,11 @@ int main()
     auto rebuiltTree = xbwt.rebuildTree();
     cout << "Rebuilt tree: " << rebuiltTree.toString() << endl;
 
+    cout << "Get children of 1: " << xbwt.getChildren(1).first << " " << xbwt.getChildren(1).second << endl;
+    cout << "Get ranked child of 1: " << xbwt.getRankedChild(1, 2) << endl;
+    cout << "Get char ranked child of 1 with label 'a' (6): " << xbwt.getCharRankedChild(1, 6, 1) << endl;
+    cout << "Get parent of 1: " << xbwt.getParent(1) << endl;
+    cout << "Subpath search of 'BD' ('24'): " << xbwt.subPathSearch("24").first << " " << xbwt.subPathSearch("24").second << endl;
+    
     return 0;
 }
