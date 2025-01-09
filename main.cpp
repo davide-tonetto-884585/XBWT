@@ -114,6 +114,7 @@ int main()
 
     // rebuild the tree
     auto rebuiltTree = xbwt.rebuildTree();
+    cout << "Rebuilt tree: " << rebuiltTree.toString() << endl;
 
     return 0;
 }

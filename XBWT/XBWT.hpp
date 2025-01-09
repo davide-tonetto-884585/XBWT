@@ -37,7 +37,7 @@ private:
 
     // private methods for inverting the XBWT transform
     std::vector<unsigned int> buildF() const;
-    std::vector<unsigned int> buildJ(std::vector<unsigned int> &F) const;
+    std::vector<long int> buildJ(std::vector<unsigned int> &F) const;
 
     // utility methods
     void radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const;

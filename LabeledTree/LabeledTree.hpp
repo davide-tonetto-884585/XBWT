@@ -73,16 +73,22 @@ public:
         return false;
     }
 
-    void addChild(LabelType lbl)
+    void pushBackChild(LabelType lbl)
     {
         auto child = new Node(lbl, this);
         children.push_back(child);
     }
 
-    void addChild(Node *child)
+    void pushBackChild(Node *child)
     {
         child->parent = this;
         children.push_back(child);
+    }
+
+    void prependChild(Node *child)
+    {
+        child->parent = this;
+        children.insert(children.begin(), child);
     }
 };
 
@@ -194,7 +200,7 @@ private:
                 else
                 {
                     currentNode = nodeStack.top();
-                    currentNode->addChild(label);
+                    currentNode->pushBackChild(label);
                     nodeStack.push(currentNode->getChildren().back());
                 }
             }

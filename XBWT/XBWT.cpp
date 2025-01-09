@@ -178,7 +178,7 @@ Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, in
         if (nodes[edges[i].second] == nullptr)
             nodes[edges[i].second] = new Node<unsigned int>(intNodes[edges[i].second].first);
 
-        nodes[edges[i].first]->addChild(nodes[edges[i].second]);
+        nodes[edges[i].first]->pushBackChild(nodes[edges[i].second]);
     }
 
     // auto tree = LabeledTree<unsigned int>(nodes[0]);
@@ -634,6 +634,26 @@ std::vector<unsigned int> XBWT::buildF() const
     return F;
 }
 
+std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const 
+{
+    std::vector<long int> J(pImpl->SLastCompressed.size(), 0);
+    for (unsigned int i = 0; i < J.size(); ++i)
+    {
+        if (pImpl->SAlphaBitCompressed[i] == 1)
+            J[i] = -1;
+        else
+        {
+            unsigned int z = J[i] = F[pImpl->SAlphaCompressed[i] - 1];
+            while (pImpl->SLastCompressed[z] != 1)
+                ++z;
+
+            F[pImpl->SAlphaCompressed[i] - 1] = z + 1;
+        }
+    }
+
+    return J;
+}
+
 LabeledTree<unsigned int> XBWT::rebuildTree() const
 {
     auto F = buildF();
@@ -642,5 +662,35 @@ LabeledTree<unsigned int> XBWT::rebuildTree() const
         std::cout << "F[" << i << "] = " << F[i] << std::endl;
     }
 
-    return LabeledTree<unsigned int>();
+    auto J = buildJ(F);
+    for (unsigned int i = 0; i < J.size(); ++i)
+    {
+        std::cout << "J[" << i << "] = " << J[i] << std::endl;
+    }
+
+    Node<unsigned int> *root = new Node<unsigned int>(pImpl->SAlphaCompressed[0]);
+    std::stack<std::pair<unsigned int, Node<unsigned int> *>> Q;
+    Q.push({0, root});
+    while (!Q.empty())
+    {
+        auto [i, u] = Q.top();
+        Q.pop();
+        long int j = J[i];
+        if (j == -1) continue;
+
+        // find first j' >= j such that SLast[j'] = 1
+        unsigned int j1 = j;
+        while (j1 < J.size() && pImpl->SLastCompressed[j1] != 1)
+            ++j1;
+
+        for (unsigned int h = j1; h >= j; --h)
+        {
+            Node<unsigned int> *v = new Node<unsigned int>(pImpl->SAlphaCompressed[h]);
+            u->prependChild(v);
+            Q.push({h, v});
+        } 
+    }
+
+
+    return LabeledTree<unsigned int>(root);
 }
