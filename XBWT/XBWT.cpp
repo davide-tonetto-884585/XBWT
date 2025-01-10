@@ -1,4 +1,3 @@
-#include "XBWT.hpp"
 #include <iostream>
 #include <stack>
 #include <cmath>
@@ -6,6 +5,8 @@
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
 #include <sdsl/int_vector.hpp>
+
+#include "XBWT.hpp"
 
 struct XBWT::MyImpl
 {
@@ -582,7 +583,7 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
         tempSAlpha[cont] = intNodes[i].first;
         SAlphaBit[cont] = _SAlphaBit[i];
         A[cont] = (cont == 0) ? 0 : (intNodes[intNodes[i].third - 1].first != prev_label); // TODO: in paper A[0] = 1 but it should be 0
-        prev_label = intNodes[intNodes[i].third - 1].first;
+        prev_label = (cont == 0) ? 0 : intNodes[intNodes[i].third - 1].first;
         ++cont;
     }
 
@@ -623,13 +624,15 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
 std::vector<unsigned int> XBWT::buildF() const
 {
     std::vector<unsigned int> C(pImpl->cardSigma, 0);
+    // count occurrences of each symbol only for internal nodes
     for (unsigned int i = 0; i < pImpl->SLastCompressed.size(); ++i)
-        ++C[pImpl->SAlphaCompressed[i] - 1];
+        if (pImpl->SAlphaBitCompressed[i] == 0)
+            ++C[pImpl->SAlphaCompressed[i] - 1];
 
     std::vector<unsigned int> F(pImpl->cardSigmaN, 0);
     F[0] = 1;
     // iter internal labels cardinality
-    for (unsigned int i = 0; i < pImpl->cardSigmaN; ++i)
+    for (unsigned int i = 0; i < pImpl->cardSigmaN - 1; ++i)
     {
         unsigned int s = 0, j = F[i];
         while (s != C[i])
@@ -752,7 +755,7 @@ long int XBWT::getCharRankedChild(unsigned int i, unsigned int c, unsigned int k
 
     if (k < 1)
         throw std::runtime_error("Error: k must be greater than 0");
-    
+
     auto [first, last] = getChildren(i);
     unsigned int y1 = pImpl->SAlphaCompressed.rank(first, c);
     unsigned int y2 = pImpl->SAlphaCompressed.rank(last + 1, c);
@@ -782,12 +785,17 @@ std::pair<long int, long int> XBWT::subPathSearch(const std::string &subPath) co
     unsigned int last = pImpl->ACompressedSelect(subPath[0] - '0' + 1) - 1;
     if (first > last)
         return {-1, -1};
-    
+
     for (unsigned int i = 1; i < subPath.size(); ++i)
     {
         unsigned int label = subPath[i] - '0';
         unsigned int k1 = pImpl->SAlphaCompressed.rank(first, label);
         unsigned int k2 = pImpl->SAlphaCompressed.rank(last + 1, label);
+
+        unsigned int check_for_z1 = pImpl->SAlphaCompressed.rank(pImpl->SAlphaCompressed.size(), label);
+        if (k1 + 1 > check_for_z1)
+            return {-1, -1};
+
         unsigned int z1 = pImpl->SAlphaCompressed.select(k1 + 1, label);
         unsigned int z2 = pImpl->SAlphaCompressed.select(k2, label);
         if (z1 > z2)

@@ -30,37 +30,41 @@ std::map<std::string, unsigned int> labelToInt(std::vector<std::string> &labels)
 
 std::vector<std::string> getLabels(const std::string &str, unsigned int &cardSigma, unsigned int &cardSigmaN)
 {
-    std::vector<std::string> labels;
+    std::vector<std::string> labels{};
+    std::vector<std::string> internalLabels{};
     std::string label = "";
-    bool isChild = false;
+    unsigned int i = 0;
     for (char ch : str)
     {
         if (ch == '(' or ch == ')')
         {
-            if (label.empty())
-                continue;
-
-            // add the label to the vector if it is not already present
-            if (std::find(labels.begin(), labels.end(), label) == labels.end())
+            if (!label.empty())
             {
-                labels.push_back(label);
-                ++cardSigma;
-                
-                if (ch == ')' and isChild)
-                    isChild = false;
-                else 
-                    ++cardSigmaN;
+                // add the label to the vector if it is not already present
+                if (std::find(labels.begin(), labels.end(), label) == labels.end())
+                {
+                    labels.push_back(label);
+                    ++cardSigma;
+                }
+
+                if (!(ch == ')' and str[i - 2] == '('))
+                {
+                    if (std::find(internalLabels.begin(), internalLabels.end(), label) == internalLabels.end())
+                    {
+                        internalLabels.push_back(label);
+                        ++cardSigmaN;
+                    }
+                }
+
+                label = "";
             }
-
-            if (ch == '(' and !isChild)
-                isChild = true;
-
-            label = "";
         }
         else
         {
             label += ch;
         }
+
+        ++i;
     }
 
     return labels;
@@ -69,7 +73,8 @@ std::vector<std::string> getLabels(const std::string &str, unsigned int &cardSig
 int main()
 {
     // Stringa di input
-    std::string str = "(A(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b))))";
+    // string str = "(A(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c))))";
+    string str = "(A(B(D(a))(a)(a(b)))(C(D(c))(b)(D(c)))(B(D(B))))";
     cout << "Input string: " << str << endl;
 
     unsigned int cardSigma = 0;
@@ -118,9 +123,9 @@ int main()
 
     cout << "Get children of 1: " << xbwt.getChildren(1).first << " " << xbwt.getChildren(1).second << endl;
     cout << "Get ranked child of 1: " << xbwt.getRankedChild(1, 2) << endl;
-    cout << "Get char ranked child of 1 with label 'a' (6): " << xbwt.getCharRankedChild(1, 6, 1) << endl;
+    cout << "Get char ranked child of 1 with label 'a' (6): " << xbwt.getCharRankedChild(7, 2, 1) << endl;
     cout << "Get parent of 1: " << xbwt.getParent(1) << endl;
     cout << "Subpath search of 'BD' ('24'): " << xbwt.subPathSearch("24").first << " " << xbwt.subPathSearch("24").second << endl;
-    
+
     return 0;
 }
