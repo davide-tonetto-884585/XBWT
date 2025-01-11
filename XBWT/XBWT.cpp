@@ -350,9 +350,12 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree,
     // t/3
     long int x = 0;
     if (rem > 0)
-        x = static_cast<unsigned int>(std::ceil(static_cast<double>((*intNodes).size() - rem) / 3.0));
+    {
+        long double realSize = (static_cast<long int>((*intNodes).size()) - rem) / 3.;
+        x = static_cast<long int>(std::ceill(realSize));
+    }
     else
-        x = static_cast<unsigned int>(std::ceil(static_cast<double>((*intNodes).size()) / 3.0));
+        x = static_cast<long int>(std::ceil(static_cast<long int>((*intNodes).size()) / 3.0));
 
     // compute j value
     short int j = -1;
@@ -669,12 +672,12 @@ std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const
 
 LabeledTree<unsigned int> XBWT::rebuildTree() const
 {
-    auto F = buildF();
-    for (unsigned int i = 0; i < F.size(); ++i)
+    auto F = buildF(); // TODO: usare direttamente ACompressed
+    /* for (unsigned int i = 0; i < F.size(); ++i)
     {
         std::cout << "F[" << i << "] = " << F[i] << ", ";
     }
-    std::cout << std::endl;
+    std::cout << std::endl; */
 
     auto J = buildJ(F);
     /* for (unsigned int i = 0; i < J.size(); ++i)
@@ -742,7 +745,7 @@ long int XBWT::getRankedChild(unsigned int i, unsigned int k) const
         throw std::runtime_error("Error: k must be greater than 0");
 
     auto [first, last] = getChildren(i);
-    if (k > last - first + 1)
+    if (first == -1 || last == -1 || (k > last - first + 1))
         return -1;
     else
         return first + k - 1;
@@ -757,6 +760,9 @@ long int XBWT::getCharRankedChild(unsigned int i, unsigned int c, unsigned int k
         throw std::runtime_error("Error: k must be greater than 0");
 
     auto [first, last] = getChildren(i);
+    if (first == -1 or last == -1)
+        return -1;
+
     unsigned int y1 = pImpl->SAlphaCompressed.rank(first, c);
     unsigned int y2 = pImpl->SAlphaCompressed.rank(last + 1, c);
     if (k > y2 - y1)
@@ -781,8 +787,8 @@ long int XBWT::getParent(unsigned int i) const
 
 std::pair<long int, long int> XBWT::subPathSearch(const std::string &subPath) const
 {
-    unsigned int first = pImpl->ACompressedSelect(subPath[0] - '0');
-    unsigned int last = pImpl->ACompressedSelect(subPath[0] - '0' + 1) - 1;
+    long int first = pImpl->ACompressedSelect(subPath[0] - '0');
+    long int last = pImpl->ACompressedSelect(subPath[0] - '0' + 1) - 1;
     if (first > last)
         return {-1, -1};
 

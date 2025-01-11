@@ -74,7 +74,8 @@ int main()
 {
     // Stringa di input
     // string str = "(A(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c))))";
-    string str = "(A(B(D(a))(a)(a(b)))(C(D(c))(b)(D(c)))(B(D(B))))";
+    // string str = "(A(B(D(a))(a)(a(b)))(C(D(c))(b)(D(c)))(B(D(B))))";
+    string str = "(a(b(c(b(x)(y)))(d(b(x)(d(b(x)(d(b(x)(y)))(b(x)(y))))))))";
     cout << "Input string: " << str << endl;
 
     unsigned int cardSigma = 0;
@@ -125,7 +126,7 @@ int main()
     cout << "Get ranked child of 1: " << xbwt.getRankedChild(1, 2) << endl;
     cout << "Get char ranked child of 1 with label 'a' (6): " << xbwt.getCharRankedChild(7, 2, 1) << endl;
     cout << "Get parent of 1: " << xbwt.getParent(1) << endl;
-    cout << "Subpath search of 'BD' ('24'): " << xbwt.subPathSearch("24").first << " " << xbwt.subPathSearch("24").second << endl;
+    cout << "Subpath search of 'BD' ('24'): " << xbwt.subPathSearch("34").first << " " << xbwt.subPathSearch("34").second << endl;
 
     return 0;
 }

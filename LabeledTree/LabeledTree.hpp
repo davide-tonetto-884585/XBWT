@@ -21,7 +21,7 @@ public:
     Node(LabelType lbl, Node *prnt = nullptr, std::vector<Node *> children = {}) : label(lbl), parent(prnt), children(children) {}
 
     ~Node()
-    {        
+    {
         for (auto child : children)
             delete child;
     }
@@ -168,7 +168,7 @@ private:
         {
             return nullptr;
         }
-        
+
         auto newNode = new Node<LabelType>(node->getLabel());
         for (const auto &child : node->getChildren())
         {
@@ -178,8 +178,80 @@ private:
         return newNode;
     }
 
+    bool areParenthesesBalanced(const std::string &str)
+    {
+        int balance = 0;
+        for (char ch : str)
+        {
+            if (ch == '(')
+            {
+                ++balance;
+            }
+            else if (ch == ')')
+            {
+                --balance;
+                if (balance < 0)
+                {
+                    return false; // More closing than opening
+                }
+            }
+        }
+        return balance == 0; // Should be zero if balanced
+    }
+
+    // Recursive function to validate the tree structure
+    bool isValidTree(const std::string &str, unsigned int &pos)
+    {
+        if (pos >= str.length())
+        {
+            return false;
+        }
+
+        // Expecting an opening parenthesis
+        if (str[pos] != '(')
+        {
+            return false;
+        }
+        ++pos;
+
+        // Expecting a node label consisting of alphanumeric characters
+        size_t label_start = pos;
+        while (pos < str.length() && std::isalnum(str[pos]))
+        {
+            ++pos;
+        }
+        if (label_start == pos)
+        {
+            return false; // No valid label found
+        }
+
+        // Recursively check for child nodes
+        while (pos < str.length() && str[pos] == '(')
+        {
+            if (!isValidTree(str, pos))
+            {
+                return false;
+            }
+        }
+
+        // Expecting a closing parenthesis
+        if (pos >= str.length() || str[pos] != ')')
+        {
+            return false;
+        }
+        ++pos;
+
+        return true;
+    }
+
     Node<LabelType> *fromString(const std::string &str)
     {
+        unsigned int pos = 0;
+        if (str.empty() || (!areParenthesesBalanced(str) || !isValidTree(str, pos)))
+        {
+            throw std::invalid_argument("Invalid tree string. Error at position: " + std::to_string(pos));
+        }
+
         std::stack<Node<LabelType> *> nodeStack;
         std::istringstream iss(str);
         char ch;
