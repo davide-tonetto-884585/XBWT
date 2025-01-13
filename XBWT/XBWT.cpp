@@ -338,6 +338,9 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree,
         *intNodes = computeIntNodes(*cTree.getRoot());
     }
 
+    // for (unsigned int i = 0; i < (*intNodes).size(); ++i)
+    //    std::cout << (*intNodes)[i].first << " " << (*intNodes)[i].second << " " << (*intNodes)[i].third << std::endl;
+
     // get number of nodes at level j I {0, 1, 2} mode 3
     long int nodeLevelCounts[] = {0, 0, 0};
     for (const auto &triplet : *intNodes)
@@ -368,14 +371,10 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree,
         }
     }
 
-    // TODO: remove this
-    if (j == -1)
-    {
-        throw std::runtime_error("Error: j value not found");
-    }
+    assert(j != -1 && "Error: j value not found");
 
-    std::vector<unsigned int> intNodesPosJ(nodeLevelCounts[j], 0);
-    std::vector<unsigned int> intNodesPosNotJ((*intNodes).size() - nodeLevelCounts[j], 0);
+    std::vector<unsigned int> intNodesPosJ(nodeLevelCounts[j] + rem, 0);
+    std::vector<unsigned int> intNodesPosNotJ((*intNodes).size() - nodeLevelCounts[j] - rem, 0);
     for (unsigned int i = 0, k = 0, l = 0; i < (*intNodes).size(); ++i)
     {
         if ((*intNodes)[i].second % 3 == j)
@@ -416,7 +415,7 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree,
     }
 
     std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> tripletsToSort(intNodesPosNotJ.size(), std::pair<unsigned int, Triplet<unsigned int, int, int>>(0, Triplet<unsigned int, int, int>(0, 0, 0)));
-    bool areAllEqual = true;
+    bool notUnique = false;
     for (unsigned int i = 0; i < intNodesPosNotJ.size(); ++i)
     {
         auto index = intNodesPosNotJ[i] + numDummyNodes;
@@ -430,16 +429,29 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree,
 
         tripletsToSort[i].second.third = tempIntNodes[tempIntNodes[index].third].first;
 
-        if (areAllEqual && (tripletsToSort[i].second.first != tripletsToSort[0].second.first || tripletsToSort[i].second.second != tripletsToSort[0].second.second || tripletsToSort[i].second.third != tripletsToSort[0].second.third))
+        if (!notUnique && i > 0 &&
+            (tripletsToSort[i].second.first == tripletsToSort[i - 1].second.first &&
+             tripletsToSort[i].second.second == tripletsToSort[i - 1].second.second &&
+             tripletsToSort[i].second.third == tripletsToSort[i - 1].second.third))
         {
-            areAllEqual = false;
+            notUnique = true;
         }
     }
 
-    radixSort(tripletsToSort);
+    std::vector<long int> indexTripletsToSortInIntNodesPosNotJ(tripletsToSort.size(), -1);
+    if (!notUnique || firstIt)
+    {
+        radixSort(tripletsToSort);
+
+        if (!notUnique)
+        {
+            for (unsigned int i = 0; i < tripletsToSort.size(); ++i)
+                indexTripletsToSortInIntNodesPosNotJ[tripletsToSort[i].first] = i;
+        }
+    }
 
     std::vector<unsigned int> intNodesPosNotJSorted(intNodesPosNotJ.size(), 0);
-    if (!areAllEqual)
+    if (notUnique)
     {
         LabeledTree<unsigned int> cTree;
         if (firstIt)
@@ -452,18 +464,20 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &cTree,
             intNodesPosNotJSorted = pathSort(cTree, nullptr, true, false, rem);
         else
             intNodesPosNotJSorted = pathSort(cTree, nullptr, false, false, rem);
+
+        if (j == 0)
+        {
+            for (auto &el : intNodesPosNotJSorted)
+                --el;
+        }
     }
     else
     {
         for (unsigned int i = 0; i < intNodesPosNotJSorted.size(); ++i)
-            intNodesPosNotJSorted[i] = intNodesPosNotJ[tripletsToSort[i].first];
+            intNodesPosNotJSorted[i] = indexTripletsToSortInIntNodesPosNotJ[tripletsToSort[i].first];
     }
 
-    if (j == 0)
-    {
-        for (auto &el : intNodesPosNotJSorted)
-            --el;
-    }
+    assert(intNodesPosNotJSorted.size() == intNodesPosNotJ.size());
 
     std::vector<unsigned int> firstIndex(intNodes->size(), 0);
     std::vector<bool> indexFound(intNodes->size(), false);
@@ -607,10 +621,10 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
     if (verbose)
     {
         // print
-        std::cout << "(SLast, SAlpha, SAlphaBit, A) " << std::endl;
+        std::cout << "(Index, SLast, SAlpha, SAlphaBit, A) " << std::endl;
         for (unsigned int i = 0; i < intNodes.size(); ++i)
         {
-            std::cout << "(" << (pImpl->SLastCompressed[i] ? "1" : "0") << ", " << pImpl->SAlphaCompressed[i] << ", " << (pImpl->SAlphaBitCompressed[i] ? "1" : "0") << ", " << pImpl->ACompressed[i] << ") " << std::endl;
+            std::cout << "(" << i << ", " << (pImpl->SLastCompressed[i] ? "1" : "0") << ", " << pImpl->SAlphaCompressed[i] << ", " << (pImpl->SAlphaBitCompressed[i] ? "1" : "0") << ", " << pImpl->ACompressed[i] << ") " << std::endl;
         }
 
         std::cout << "SLast size: " << sdsl::size_in_bytes(SLast) << " B" << std::endl;
@@ -673,17 +687,18 @@ std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const
 LabeledTree<unsigned int> XBWT::rebuildTree() const
 {
     auto F = buildF(); // TODO: usare direttamente ACompressed
-    /* for (unsigned int i = 0; i < F.size(); ++i)
+    for (unsigned int i = 0; i < F.size(); ++i)
     {
         std::cout << "F[" << i << "] = " << F[i] << ", ";
     }
-    std::cout << std::endl; */
+    std::cout << std::endl;
 
     auto J = buildJ(F);
-    /* for (unsigned int i = 0; i < J.size(); ++i)
+    for (unsigned int i = 0; i < J.size(); ++i)
     {
-        std::cout << "J[" << i << "] = " << J[i] << std::endl;
-    } */
+        std::cout << "J[" << i << "] = " << J[i] << ", ";
+    }
+    std::cout << std::endl;
 
     Node<unsigned int> *root = new Node<unsigned int>(pImpl->SAlphaCompressed[0]);
     std::stack<std::pair<unsigned int, Node<unsigned int> *>> Q;
