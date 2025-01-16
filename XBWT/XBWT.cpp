@@ -19,12 +19,23 @@ struct XBWT::MyImpl
     sdsl::rrr_vector<>::rank_1_type ACompressedRank;
     sdsl::rrr_vector<>::select_1_type ACompressedSelect;
 
-    sdsl::rrr_vector<> SigmaLeafsCompressed;
-    sdsl::rrr_vector<>::rank_0_type SigmaLeafsCompressedRank0;
+    sdsl::rrr_vector<> SigmaNCompressed;
+    sdsl::rrr_vector<>::rank_1_type SigmaNCompressedRank;
     unsigned int cardSigma;
     unsigned int cardSigmaN;
 };
 
+/**
+ * @brief Constructor for the XBWT class.
+ *
+ * This constructor initializes an XBWT object using a labeled tree,
+ * the cardinality of the alphabet, and the cardinality of the internal alphabet.
+ *
+ * @param tree The labeled tree used to construct the XBWT.
+ * @param cardSigma The cardinality of the alphabet.
+ * @param cardSigmaN The cardinality of the internal alphabet.
+ * @param verbose If true, enables verbose mode for debugging.
+ */
 XBWT::XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsigned int cardSigmaN, bool verbose)
 {
     pImpl = std::make_unique<MyImpl>();
@@ -35,6 +46,15 @@ XBWT::XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsign
 
 XBWT::~XBWT() = default;
 
+/**
+ * @brief Performs radix sort on a vector of pairs.
+ *
+ * This function sorts a vector of pairs using radix sort. Each pair consists of an unsigned int
+ * and a Triplet<unsigned int, int, int>. The sorting is based on the integer values derived from
+ * the Triplet.
+ *
+ * @param arr The vector of pairs to be sorted.
+ */
 void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const
 {
     auto countSort = [](std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr, unsigned int exp)
@@ -83,6 +103,16 @@ void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, i
     }
 }
 
+/**
+ * @brief Computes the internal nodes of a labeled tree.
+ *
+ * This function traverses a labeled tree in preorder and computes the internal nodes.
+ * Each internal node is represented as a Triplet containing the node's label, its level,
+ * and the index of its parent node in the array (from 1 to t, root has parent 0).
+ *
+ * @param root The root node of the labeled tree.
+ * @return A vector of Triplets representing the internal nodes of the tree.
+ */
 std::vector<Triplet<unsigned int, int, int>> XBWT::computeIntNodes(const Node<unsigned int> &root) const
 {
     std::vector<Triplet<unsigned int, int, int>> intNodes;
@@ -111,6 +141,18 @@ std::vector<Triplet<unsigned int, int, int>> XBWT::computeIntNodes(const Node<un
     return intNodes;
 }
 
+/**
+ * @brief Contracts a labeled tree by removing nodes on levels equal to j (mod 3).
+ *
+ * This function contracts a labeled tree by removing
+ * nodes on levels equal to j (mod 3). If sorted triplets are provided (in the first iteration
+ * of pathSort algorithm) then it uses them to rename the nodes.
+ *
+ * @param intNodes A vector of Triplets representing the internal nodes of the tree.
+ * @param j The level used to determine which nodes to remove.
+ * @param tripletsSorted An optional vector used to rename the nodes.
+ * @return A pointer to the root node of the contracted tree.
+ */
 Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted) const
 {
     if (tripletsSorted)
@@ -131,13 +173,6 @@ Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, in
 
     if (j == 0)
         intNodes[0].first = 1;
-
-    // create nodes
-    /*std::vector<Node<unsigned int> *> nodes(intNodes.size(), nullptr);
-    for (unsigned int i = 0; i < intNodes.size(); ++i)
-    {
-        nodes[i] = new Node<unsigned int>(intNodes[i].first);
-    }*/
 
     short int jNext[] = {1, 2, 0};
     std::vector<std::pair<unsigned int, unsigned int>> edges;
@@ -192,6 +227,24 @@ Node<unsigned int> *XBWT::contractTree(std::vector<Triplet<unsigned int, int, in
     return nodes[0];
 }
 
+/**
+ * @brief Merges two sorted vectors of node positions based on specific conditions.
+ *
+ * This function merges two sorted vectors of node positions (`intNodesPosNotJSorted` and `intNodesPosJSorted`)
+ * based on specific conditions related to the levels of the nodes and their values. This in order
+ * to get a final ordering of the nodes at each recursive step of pathSort algorithm.
+ *
+ * @param intNodesPosNotJSorted A vector of sorted node positions not at level j.
+ * @param firstIndexIntNodesPosNotJSorted A vector containing the first index of elements in `intNodesPosNotJSorted`.
+ * @param indexFoundIntNodesPosNotJSorted A vector indicating if a given element is found in `intNodesPosNotJSorted`.
+ * @param intNodesPosJSorted A vector of sorted node positions at level j.
+ * @param tempIntNodes A vector of internal nodes as described in function `computeIntNodes`.
+ * @param numDummyNodes The number of dummy nodes prepended in `tempIntNodes`.
+ * @param jv The level j used to determine the merging conditions.
+ * @param dummyRoot A boolean indicating if a dummy root is used.
+ * @param firstIt A boolean indicating if this is the first iteration of the `pathSort` algorithm.
+ * @return A merged vector of node positions sorted.
+ */
 std::vector<unsigned int> XBWT::pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot, bool firstIt) const
 {
     std::vector<unsigned int> merged(intNodesPosNotJSorted.size() + intNodesPosJSorted.size(), 0);
@@ -353,6 +406,20 @@ std::vector<unsigned int> XBWT::pathSortMerge(std::vector<unsigned int> &intNode
     return merged;
 }
 
+/**
+ * @brief Stable sort the nodes based on the π’s component of its triplets.
+ *
+ * This function stable sorts the nodes of a labeled tree based on the string obtained by
+ * concatenating the labels (π component) on the upward path from the node's parent to the root (the root
+ * has empty π component).
+ *
+ * @param tree The labeled tree to be sorted.
+ * @param intNodes A pointer to a vector of Triplets representing the internal nodes of the tree. If nullptr, the internal nodes will be computed using the function `computeIntNodes`.
+ * @param dummyRoot A boolean indicating if a dummy root is used.
+ * @param firstIt A boolean indicating if this is the first iteration of the pathSort algorithm.
+ * @param rem The number of nodes to be removed.
+ * @return A vector of sorted node positions.
+ */
 std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &tree, std::vector<Triplet<unsigned int, int, int>> *intNodes, bool dummyRoot, bool firstIt, unsigned int rem) const
 {
     std::vector<Triplet<unsigned int, int, int>> localIntNodes;
@@ -599,6 +666,17 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &tree, 
     return pathSortMerge(intNodesPosNotJSorted, firstIndex, indexFound, intNodesPosJSorted, tempIntNodes, numDummyNodes, j, dummyRoot, firstIt);
 }
 
+/**
+ * @brief Creates the XBWT of the given labeled tree.
+ *
+ * This function creates the XBWT structure from a labeled tree. It computes the internal nodes,
+ * sorts them using the pathSort algorithm, and constructs various bit vectors and wavelet trees
+ * required for the XBWT representation. Optionally, it can print detailed information about the
+ * construction process if verbose mode is enabled.
+ *
+ * @param tree The labeled tree used to construct the XBWT.
+ * @param verbose If true, enables verbose mode for debugging.
+ */
 void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
 {
     std::vector<Triplet<unsigned int, int, int>> intNodes;
@@ -631,7 +709,7 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
     sdsl::int_vector<> tempSAlpha(intNodes.size());
     sdsl::bit_vector SAlphaBit(intNodes.size()); // SAlphaBit[i] = 1 iff the corresponding label is a leaf label
     sdsl::bit_vector A(intNodes.size());         // A[1] = 1, A[j] = 1 iff the first symbol of Sπ[j] differs from the first symbol of Sπ[j − 1]
-    sdsl::bit_vector SigmaLeafs(pImpl->cardSigma);
+    sdsl::bit_vector SigmaN(pImpl->cardSigma, 0);
     unsigned int cont = 0;
     unsigned int prev_label = 0;
     for (unsigned int i : posIntNodesSorted)
@@ -642,7 +720,8 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
         A[cont] = (cont == 0) ? 0 : (intNodes[intNodes[i].third - 1].first != prev_label); // TODO: in paper A[0] = 1 but it should be 0
         prev_label = (cont == 0) ? 0 : intNodes[intNodes[i].third - 1].first;
 
-        SigmaLeafs[intNodes[i].first - 1] = SAlphaBit[cont];
+        if (SigmaN[intNodes[i].first - 1] == 0 && SAlphaBit[cont] == 0)
+            SigmaN[intNodes[i].first - 1] = 1;
 
         ++cont;
     }
@@ -651,14 +730,14 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
     pImpl->SLastCompressed = sdsl::rrr_vector<>(SLast);
     pImpl->SAlphaBitCompressed = sdsl::rrr_vector<>(SAlphaBit);
     pImpl->ACompressed = sdsl::rrr_vector<>(A);
-    pImpl->SigmaLeafsCompressed = sdsl::rrr_vector<>(SigmaLeafs);
+    pImpl->SigmaNCompressed = sdsl::rrr_vector<>(SigmaN);
 
     // add rank and select support
     pImpl->SLastCompressedRank = sdsl::rrr_vector<>::rank_1_type(&pImpl->SLastCompressed);
     pImpl->SLastCompressedSelect = sdsl::rrr_vector<>::select_1_type(&pImpl->SLastCompressed);
     pImpl->ACompressedRank = sdsl::rrr_vector<>::rank_1_type(&pImpl->ACompressed);
     pImpl->ACompressedSelect = sdsl::rrr_vector<>::select_1_type(&pImpl->ACompressed);
-    pImpl->SigmaLeafsCompressedRank0 = sdsl::rrr_vector<>::rank_0_type(&pImpl->SigmaLeafsCompressed);
+    pImpl->SigmaNCompressedRank = sdsl::rrr_vector<>::rank_1_type(&pImpl->SigmaNCompressed);
 
     // Create the wavelet tree
     sdsl::construct_im(pImpl->SAlphaCompressed, tempSAlpha);
@@ -680,11 +759,18 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
         std::cout << "SAlphaBit compressed size: " << sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) << " B" << std::endl;
         std::cout << "A size: " << sdsl::size_in_bytes(A) << " B" << std::endl;
         std::cout << "A compressed size: " << sdsl::size_in_bytes(pImpl->ACompressed) << " B" << std::endl;
-        std::cout << "SigmaLeafs size: " << sdsl::size_in_bytes(SigmaLeafs) << " B" << std::endl;
-        std::cout << "SigmaLeafs compressed size: " << sdsl::size_in_bytes(pImpl->SigmaLeafsCompressed) << " B" << std::endl;
+        std::cout << "SigmaN size: " << sdsl::size_in_bytes(SigmaN) << " B" << std::endl;
+        std::cout << "SigmaN compressed size: " << sdsl::size_in_bytes(pImpl->SigmaNCompressed) << " B" << std::endl;
     }
 }
 
+/**
+ * @brief Builds the F array for the XBWT structure.
+ *
+ * Compute array F such that F[i] = j iff Sπ [ j] is the first entry of S prefixed by i.
+ *
+ * @return A vector of unsigned integers representing the F array.
+ */
 std::vector<unsigned int> XBWT::buildF() const
 {
     std::vector<unsigned int> C(pImpl->cardSigma, 0);
@@ -711,7 +797,15 @@ std::vector<unsigned int> XBWT::buildF() const
     return F;
 }
 
-std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const
+/**
+ * @brief Builds the J array for the XBWT structure.
+ *
+ * Compute array J such that J[i] = j if S[j] is the first child of S[i],
+ * and J[i] = −1 if S[i] is a leaf.
+ *
+ * @return A vector of long integers representing the J array.
+ */
+std::vector<long int> XBWT::buildJ() const
 {
     std::vector<long int> J(pImpl->SLastCompressed.size(), 0);
     std::vector<long int> FMap(pImpl->cardSigmaN, -1);
@@ -721,10 +815,7 @@ std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const
             J[i] = -1;
         else
         {
-            unsigned int z = 0, internalNodeIndex = pImpl->SigmaLeafsCompressedRank0(pImpl->SAlphaCompressed[i]);
-            std::cout << "Internal node index: " << internalNodeIndex << std::endl;
-            std::cout << F[internalNodeIndex - 1] << std::endl;
-            std::cout << pImpl->ACompressedSelect(internalNodeIndex) << std::endl;
+            unsigned int z = 0, internalNodeIndex = pImpl->SigmaNCompressedRank(pImpl->SAlphaCompressed[i]);
             if (FMap[internalNodeIndex - 1] == -1)
                 z = J[i] = FMap[internalNodeIndex - 1] = pImpl->ACompressedSelect(internalNodeIndex);
             else
@@ -740,21 +831,29 @@ std::vector<long int> XBWT::buildJ(std::vector<unsigned int> &F) const
     return J;
 }
 
+/**
+ * @brief Rebuilds the labeled tree from the XBWT structure.
+ *
+ * This function rebuilds the labeled tree from the XBWT structure. It uses the `J` array
+ * and reconstructs the tree by traversing the compressed vectors and creating the nodes accordingly.
+ *
+ * @return A labeled tree reconstructed from the XBWT structure.
+ */
 LabeledTree<unsigned int> XBWT::rebuildTree() const
 {
-    auto F = buildF(); // TODO: usare direttamente ACompressed
+    /* auto F = buildF(); // TODO: usare direttamente ACompressed
     for (unsigned int i = 0; i < F.size(); ++i)
     {
         std::cout << "F[" << i << "] = " << F[i] << ", ";
     }
-    std::cout << std::endl;
+    std::cout << std::endl; */
 
-    auto J = buildJ(F);
-    for (unsigned int i = 0; i < J.size(); ++i)
+    auto J = buildJ();
+    /* for (unsigned int i = 0; i < J.size(); ++i)
     {
         std::cout << "J[" << i << "] = " << J[i] << ", ";
     }
-    std::cout << std::endl;
+    std::cout << std::endl; */
 
     Node<unsigned int> *root = new Node<unsigned int>(pImpl->SAlphaCompressed[0]);
     std::stack<std::pair<unsigned int, Node<unsigned int> *>> Q;
@@ -783,6 +882,17 @@ LabeledTree<unsigned int> XBWT::rebuildTree() const
     return LabeledTree<unsigned int>(root);
 }
 
+/**
+ * @brief Retrieves the children of a node from the XBWT structure.
+ *
+ * This function retrieves the children of a node in the XBWT structure. It uses the compressed
+ * vectors to determine the range of positions corresponding to the children of the given node.
+ *
+ * @param i The index of the node whose children are to be retrieved.
+ * @return A pair of long integers representing the range [first, last] of the children.
+ *         If the node has no children, returns {-1, -1}.
+ * @throws std::runtime_error If the index is out of bounds.
+ */
 std::pair<long int, long int> XBWT::getChildren(unsigned int i) const
 {
     if (i >= pImpl->SLastCompressed.size() || i < 0)
@@ -793,7 +903,7 @@ std::pair<long int, long int> XBWT::getChildren(unsigned int i) const
 
     unsigned int c = pImpl->SAlphaCompressed[i];
     unsigned int r = pImpl->SAlphaCompressed.rank(i + 1, c);
-    unsigned int y = pImpl->ACompressedSelect(pImpl->SigmaLeafsCompressedRank0(c)); // F[c]
+    unsigned int y = pImpl->ACompressedSelect(pImpl->SigmaNCompressedRank(c)); // F[c]
     unsigned int z = pImpl->SLastCompressedRank(y);
 
     long int first = 0;
@@ -807,6 +917,18 @@ std::pair<long int, long int> XBWT::getChildren(unsigned int i) const
     return {first, last};
 }
 
+/**
+ * @brief Retrieves the k-th child of a node in the XBWT structure.
+ *
+ * This function retrieves the k-th child of a node in the XBWT structure. It uses the `getChildren`
+ * function to determine the range of positions corresponding to the children of the given node
+ * and returns the k-th child within that range.
+ *
+ * @param i The index of the node whose k-th child is to be retrieved.
+ * @param k The rank of the child to be retrieved (1-based index).
+ * @return The index of the k-th child, or -1 if the node has fewer than k children or if the node has no children.
+ * @throws std::runtime_error If the index is out of bounds or if k is less than 1.
+ */
 long int XBWT::getRankedChild(unsigned int i, unsigned int k) const
 {
     if (i >= pImpl->SLastCompressed.size() || i < 0)
@@ -822,6 +944,19 @@ long int XBWT::getRankedChild(unsigned int i, unsigned int k) const
         return first + k - 1;
 }
 
+/**
+ * @brief Retrieves the k-th child of a node with a specific label in the XBWT structure.
+ *
+ * This function retrieves the k-th child of a node with a specific label in the XBWT structure.
+ * It uses the `getChildren` function to determine the range of positions corresponding to the children
+ * of the given node and returns the k-th child with the specified label within that range.
+ *
+ * @param i The index of the node whose k-th child with the specified label is to be retrieved.
+ * @param c The label of the child to be retrieved.
+ * @param k The rank of the child to be retrieved (1-based index).
+ * @return The index of the k-th child with the specified label, or -1 if the node has fewer than k children with that label or if the node has no children.
+ * @throws std::runtime_error If the index is out of bounds or if k is less than 1.
+ */
 long int XBWT::getCharRankedChild(unsigned int i, unsigned int c, unsigned int k) const
 {
     if (i >= pImpl->SLastCompressed.size() || i < 0)
@@ -842,6 +977,16 @@ long int XBWT::getCharRankedChild(unsigned int i, unsigned int c, unsigned int k
         return pImpl->SAlphaCompressed.select(y1 + k, c);
 }
 
+/**
+ * @brief Retrieves the parent of a node in the XBWT structure.
+ *
+ * This function retrieves the parent of a node in the XBWT structure. It uses the compressed
+ * vectors to determine the position of the parent node.
+ *
+ * @param i The index of the node whose parent is to be retrieved.
+ * @return The index of the parent node, or -1 if the node is the root or if the index is out of bounds.
+ * @throws std::runtime_error If the index is out of bounds.
+ */
 long int XBWT::getParent(unsigned int i) const
 {
     if (i >= pImpl->SLastCompressed.size() || i < 0)
@@ -851,15 +996,26 @@ long int XBWT::getParent(unsigned int i) const
         return -1;
 
     unsigned int c = pImpl->ACompressedRank(i + 1);
-    unsigned int y = pImpl->ACompressedSelect(pImpl->SigmaLeafsCompressedRank0(c));
+    unsigned int y = pImpl->ACompressedSelect(pImpl->SigmaNCompressedRank(c));
     unsigned int k = pImpl->SLastCompressedRank(i) - pImpl->SLastCompressedRank(y);
     return pImpl->SAlphaCompressed.select(k + 1, c);
 }
 
+/**
+ * @brief Searches for the rannge of nodes whose upward path is prefixed by a given string reversed.
+ *
+ * This function searches for a subpath in the XBWT structure. It uses the compressed vectors
+ * to determine the range of positions corresponding to the nodes whose upward path is prefixed 
+ * by a given string reversed.
+ *
+ * @param subPath The subpath to be searched for, represented as a string of labels.
+ * @return A pair of long integers representing the range [first, last] of the nodes that match the subpath.
+ *         If the subpath is not found, returns {-1, -1}.
+ */
 std::pair<long int, long int> XBWT::subPathSearch(const std::string &subPath) const
 {
-    long int first = pImpl->ACompressedSelect(pImpl->SigmaLeafsCompressedRank0(subPath[0] - '0'));
-    long int last = pImpl->ACompressedSelect(pImpl->SigmaLeafsCompressedRank0(subPath[0] - '0' + 1)) - 1;
+    long int first = pImpl->ACompressedSelect(pImpl->SigmaNCompressedRank(subPath[0] - '0'));
+    long int last = pImpl->ACompressedSelect(pImpl->SigmaNCompressedRank(subPath[0] - '0' + 1)) - 1;
     if (first > last)
         return {-1, -1};
 
