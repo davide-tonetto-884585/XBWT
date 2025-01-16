@@ -74,8 +74,11 @@ int main()
 {
     // Stringa di input
     // string str = "(A(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c))))";
-    // string str = "(A(B(D(a))(a)(a(b)))(C(D(c))(b)(D(c)))(B(D(B))))";
-    string str = "(a(b(c(b(x)(y)))))";
+    string str = "(A(B(D(a))(a)(E(b(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b))))))(C(D(c))(b)(D(c)))(B(D(b))))";
+    // string str = "(a(b(c(b(c(b(c(b(x)(y)(z)))))(y)(z)))))";
+    // string str = "(a(b(c(b(c(x)(y)(z))))))";
+    // string str = "(1(2(1(2)(2(3)))(2)))";
+
     cout << "Input string: " << str << endl;
 
     unsigned int cardSigma = 0;
@@ -122,11 +125,15 @@ int main()
     auto rebuiltTree = xbwt.rebuildTree();
     cout << "Rebuilt tree: " << rebuiltTree.toString() << endl;
 
-    cout << "Get children of 1: " << xbwt.getChildren(1).first << " " << xbwt.getChildren(1).second << endl;
+    cout << "Get children of 1: " << xbwt.getChildren(7).first << " " << xbwt.getChildren(7).second << endl;
     cout << "Get ranked child of 1: " << xbwt.getRankedChild(1, 2) << endl;
-    cout << "Get char ranked child of 1 with label 'a' (6): " << xbwt.getCharRankedChild(7, 2, 1) << endl;
-    cout << "Get parent of 1: " << xbwt.getParent(1) << endl;
-    cout << "Subpath search of 'BD' ('24'): " << xbwt.subPathSearch("42").first << " " << xbwt.subPathSearch("42").second << endl;
+    cout << "Get char ranked child of 1 with label 'a' (6): " << xbwt.getCharRankedChild(4, 2, 1) << endl;
+    cout << "Get parent of 1: " << xbwt.getParent(7) << endl;
+    cout << "Get parent of 1: " << xbwt.getParent(3) << endl;
+    cout << "Get parent of 1: " << xbwt.getParent(4) << endl;
+    cout << "Get parent of 1: " << xbwt.getParent(2) << endl;
+
+    cout << "Subpath search of 'BD' ('24'): " << xbwt.subPathSearch("23").first << " " << xbwt.subPathSearch("23").second << endl;
 
     return 0;
 }
