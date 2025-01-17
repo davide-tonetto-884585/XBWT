@@ -172,7 +172,7 @@ private:
         auto newNode = new Node<LabelType>(node->getLabel());
         for (const auto &child : node->getChildren())
         {
-            newNode->addChild(copyTree(child));
+            newNode->pushBackChild(copyTree(child));
         }
 
         return newNode;

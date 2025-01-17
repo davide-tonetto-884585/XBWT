@@ -29,7 +29,7 @@ private:
     std::unique_ptr<MyImpl> pImpl;
 
     // private methods for building the XBWT
-    void createXBWT(const LabeledTree<unsigned int> &tree, bool verbose = false);
+    void createXBWT(const LabeledTree<unsigned int> &tree, bool usePathSort = true, bool verbose = false, std::vector<unsigned int> *intNodesPosSorted = nullptr);
     std::vector<unsigned int> pathSort(const LabeledTree<unsigned int> &cTree, std::vector<Triplet<unsigned int, int, int>> *intNodes = nullptr, bool dummyRoot = false, bool firstIt = true, unsigned int rem = 0) const;
     std::vector<unsigned int> pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot = false, bool firstIt = false) const;
     Node<unsigned int> *contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted = nullptr) const;
@@ -43,7 +43,7 @@ private:
     void radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const;
 
 public:
-    XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsigned int cardSigmaN, bool verbose = false);
+    XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsigned int cardSigmaN, bool usePathSort = true, bool verbose = false, std::vector<unsigned int> *intNodesPosSorted = nullptr);
     ~XBWT();
 
     // rebuild tree
@@ -53,10 +53,18 @@ public:
     std::pair<long int, long int> getChildren(unsigned int i) const;
     long int getRankedChild(unsigned int i, unsigned int k) const;
     long int getCharRankedChild(unsigned int i, unsigned int c, unsigned int k) const; // TODO: change c to string/char
+    unsigned int getDegree(unsigned int i) const;
+    unsigned int getCharDegree(unsigned int i, unsigned int c) const; // TODO: change c to string/char
     long int getParent(unsigned int i) const;
+    std::vector<unsigned int> getSubtree(unsigned int i, unsigned int order = 0) const;
 
     // tree search methods
     std::pair<long int, long int> subPathSearch(const std::string &subPath) const;
+
+    // testing methods
+    unsigned int getNodeLabel(unsigned int i) const;
+    std::string getUpwardPath(unsigned int i) const;
+    std::vector<unsigned int> upwardStableSortConstruction(const LabeledTree<unsigned int> &tree, std::vector<Triplet<unsigned int, int, int>> *intNodes = nullptr) const;
 };
 
 #endif // XBWT_HPP

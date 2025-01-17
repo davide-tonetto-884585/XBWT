@@ -34,14 +34,16 @@ struct XBWT::MyImpl
  * @param tree The labeled tree used to construct the XBWT.
  * @param cardSigma The cardinality of the alphabet.
  * @param cardSigmaN The cardinality of the internal alphabet.
+ * @param usePathSort If true, uses path sort to construct the XBWT.
  * @param verbose If true, enables verbose mode for debugging.
+ * @param intNodesPosSorted An optional vector of sorted internal node positions.
  */
-XBWT::XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsigned int cardSigmaN, bool verbose)
+XBWT::XBWT(const LabeledTree<unsigned int> &tree, unsigned int cardSigma, unsigned int cardSigmaN, bool usePathSort, bool verbose, std::vector<unsigned int> *intNodesPosSorted)
 {
     pImpl = std::make_unique<MyImpl>();
     pImpl->cardSigma = cardSigma;
     pImpl->cardSigmaN = cardSigmaN;
-    createXBWT(tree, verbose);
+    createXBWT(tree, usePathSort, verbose, intNodesPosSorted);
 }
 
 XBWT::~XBWT() = default;
@@ -101,6 +103,58 @@ void XBWT::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, i
     {
         countSort(arr, exp);
     }
+}
+
+/**
+ * @brief Return an order for the intNodes array of the labeled tree.
+ *
+ * This function constructs the XBWT from a labeled tree. It uses a stable sort to order the internal nodes
+ * upward paths. Not linear time complexity as for pathSort function.
+ *
+ * @param tree The labeled tree used to construct the XBWT.
+ * @param intNodes A vector of Triplets representing the internal nodes of the tree.
+ * @return intNodes sorted positions needed for XBWT construction
+ */
+std::vector<unsigned int> XBWT::upwardStableSortConstruction(const LabeledTree<unsigned int> &tree, std::vector<Triplet<unsigned int, int, int>> *intNodes) const
+{
+    std::vector<Triplet<unsigned int, int, int>> localIntNodes;
+    if (intNodes == nullptr)
+    {
+        localIntNodes = computeIntNodes(*tree.getRoot());
+        intNodes = &localIntNodes;
+    }
+    else
+    {
+        *intNodes = computeIntNodes(*tree.getRoot());
+    }
+
+    std::vector<std::pair<unsigned int, std::string>> intNodesPaths;
+    intNodesPaths.push_back(std::pair<unsigned int, std::string>(0, ""));
+    for (unsigned int i = 1; i < (*intNodes).size(); ++i)
+    {
+        std::ostringstream oss;
+        auto parentNode = (*intNodes)[(*intNodes)[i].third - 1];
+        oss << parentNode.first;
+        do
+        {
+            parentNode = (*intNodes)[parentNode.third - 1];
+            if (parentNode.third != 0)
+                oss << parentNode.first;
+        } while (parentNode.third != 0);
+
+        intNodesPaths.push_back(std::pair<unsigned int, std::string>(i, oss.str()));
+    }
+
+    std::stable_sort(intNodesPaths.begin(), intNodesPaths.end(), [](const std::pair<unsigned int, std::string> &a, const std::pair<unsigned int, std::string> &b)
+                     { return a.second < b.second; });
+
+    std::vector<unsigned int> intNodesPosSorted(intNodesPaths.size(), 0);
+    for (unsigned int i = 0; i < intNodesPaths.size(); ++i)
+    {
+        intNodesPosSorted[i] = intNodesPaths[i].first;
+    }
+
+    return intNodesPosSorted;
 }
 
 /**
@@ -301,14 +355,24 @@ std::vector<unsigned int> XBWT::pathSortMerge(std::vector<unsigned int> &intNode
                         }
                         else
                         {
-                            if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes] ||
-                                !indexFoundIntNodesPosNotJSorted[intNodesPosNotJSorted[i]])
-                                throw std::runtime_error("Error: index not found in merge");
+                            unsigned int v1 = tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].first;
+                            unsigned int v2 = tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].first;
 
-                            unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes];
-                            unsigned int index2 = firstIndexIntNodesPosNotJSorted[intNodesPosNotJSorted[i]];
+                            if (v1 == v2)
+                            {
+                                if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes] ||
+                                    !indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes])
+                                    throw std::runtime_error("Error: index 2 not found in merge");
 
-                            if (index1 > index2)
+                                unsigned int index1 = indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes];
+                                unsigned int index2 = indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes];
+
+                                if (index1 > index2) // prima era >
+                                    merged[cont++] = intNodesPosNotJSorted[i++];
+                                else
+                                    merged[cont++] = intNodesPosJSorted[j++];
+                            }
+                            else if (v1 < v2)
                                 merged[cont++] = intNodesPosNotJSorted[i++];
                             else
                                 merged[cont++] = intNodesPosJSorted[j++];
@@ -649,8 +713,8 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &tree, 
     }
 
     // sort by first and second element
-    std::sort(pairIntNodesPosJSorted.begin(), pairIntNodesPosJSorted.end(), [](const Triplet<unsigned int, unsigned int, unsigned int> &a, const Triplet<unsigned int, unsigned int, unsigned int> &b)
-              { return a.first < b.first || (a.first == b.first && a.second < b.second); });
+    std::stable_sort(pairIntNodesPosJSorted.begin(), pairIntNodesPosJSorted.end(), [](const Triplet<unsigned int, unsigned int, unsigned int> &a, const Triplet<unsigned int, unsigned int, unsigned int> &b)
+                     { return a.first < b.first || (a.first == b.first && a.second < b.second); });
 
     std::vector<unsigned int> intNodesPosJSorted(intNodesPosJ.size(), 0);
     for (unsigned int i = 0; i < pairIntNodesPosJSorted.size(); ++i)
@@ -675,12 +739,22 @@ std::vector<unsigned int> XBWT::pathSort(const LabeledTree<unsigned int> &tree, 
  * construction process if verbose mode is enabled.
  *
  * @param tree The labeled tree used to construct the XBWT.
+ * @param usePathSort If true, uses the pathSort algorithm to sort the internal nodes.
  * @param verbose If true, enables verbose mode for debugging.
+ * @param intNodesPosSorted An optional vector to store the sorted positions of the internal nodes.
  */
-void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
+void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool usePathSort, bool verbose, std::vector<unsigned int> *intNodesPosSorted)
 {
+    std::vector<unsigned int> posIntNodesSorted;
     std::vector<Triplet<unsigned int, int, int>> intNodes;
-    auto posIntNodesSorted = pathSort(tree, &intNodes);
+    if (usePathSort)
+    {
+        posIntNodesSorted = pathSort(tree, &intNodes);
+    }
+    else
+    {
+        posIntNodesSorted = upwardStableSortConstruction(tree, &intNodes);
+    }
 
     if (verbose)
     {
@@ -688,6 +762,11 @@ void XBWT::createXBWT(const LabeledTree<unsigned int> &tree, bool verbose)
         for (unsigned int i : posIntNodesSorted)
             std::cout << i << " ";
         std::cout << std::endl;
+    }
+
+    if (intNodesPosSorted)
+    {
+        *intNodesPosSorted = posIntNodesSorted;
     }
 
     std::vector<unsigned int> posLast(intNodes.size(), 0);
@@ -903,11 +982,12 @@ std::pair<long int, long int> XBWT::getChildren(unsigned int i) const
 
     unsigned int c = pImpl->SAlphaCompressed[i];
     unsigned int r = pImpl->SAlphaCompressed.rank(i + 1, c);
-    unsigned int y = pImpl->ACompressedSelect(pImpl->SigmaNCompressedRank(c)); // F[c]
+    unsigned int cIndex = pImpl->SigmaNCompressedRank(c);
+    unsigned int y = pImpl->ACompressedSelect(cIndex); // F[c]
     unsigned int z = pImpl->SLastCompressedRank(y);
 
     long int first = 0;
-    if (z + r - 1 < 1) // TODO: their pseudocode seems to be wrong for i = 0...
+    if (static_cast<long int>(z + r) - 1 < 1) // TODO: their pseudocode seems to be wrong for i = 0...
         first = 1;
     else
         first = pImpl->SLastCompressedSelect(z + r - 1) + 1;
@@ -978,6 +1058,48 @@ long int XBWT::getCharRankedChild(unsigned int i, unsigned int c, unsigned int k
 }
 
 /**
+ * @brief Return the number of children of a node i in the XBWT structure.
+ *
+ * @param i Index of the node.
+ * @return Number of children of the node i.
+ */
+unsigned int XBWT::getDegree(unsigned int i) const
+{
+    if (i >= pImpl->SLastCompressed.size() || i < 0)
+        throw std::runtime_error("Error: index out of bounds");
+
+    if (pImpl->SAlphaBitCompressed[i] == 1)
+        return 0;
+
+    auto [first, last] = getChildren(i);
+    if (first == -1 || last == -1)
+        return 0;
+
+    return last - first + 1;
+}
+
+/**
+ * @brief Return the number of children of a node i with label c in the XBWT structure.
+ *
+ * @param i Index of the node.
+ * @param c Label of the children.
+ * @return Nnumber of children of the node i with label c.
+ */
+unsigned int XBWT::getCharDegree(unsigned int i, unsigned int c) const
+{
+    if (i >= pImpl->SLastCompressed.size() || i < 0)
+        throw std::runtime_error("Error: index out of bounds");
+
+    auto [first, last] = getChildren(i);
+    if (first == -1 or last == -1)
+        return 0;
+
+    unsigned int y1 = pImpl->SAlphaCompressed.rank(first, c);
+    unsigned int y2 = pImpl->SAlphaCompressed.rank(last + 1, c);
+    return y2 - y1;
+}
+
+/**
  * @brief Retrieves the parent of a node in the XBWT structure.
  *
  * This function retrieves the parent of a node in the XBWT structure. It uses the compressed
@@ -1002,10 +1124,104 @@ long int XBWT::getParent(unsigned int i) const
 }
 
 /**
+ * @brief Return the subtree rooted at node i in the XBWT structure.
+ *
+ * This function returns the subtree rooted at node i in the XBWT structure. The order parameter
+ * specifies the type of traversal to be used to retrieve the subtree. Use 0 for preorder, 1 for
+ * postorder, and 2 for inorder traversal.
+ *
+ * @param i Index of the root node.
+ * @return A vector of unsigned integers representing the labels of nodes in the subtree rooted at node i.
+ */
+std::vector<unsigned int> XBWT::getSubtree(unsigned int i, unsigned int order) const
+{
+    std::vector<unsigned int> subtree;
+
+    if (order == 0)
+    {
+        // Pre-order traversal
+        std::stack<unsigned int> stack;
+        stack.push(i);
+
+        while (!stack.empty())
+        {
+            unsigned int node = stack.top();
+            stack.pop();
+            subtree.push_back(pImpl->SAlphaCompressed[node]);
+
+            auto [first, last] = getChildren(node);
+            for (unsigned int j = last; j >= first && j != static_cast<unsigned int>(-1); --j)
+                stack.push(j);
+        }
+    }
+    else if (order == 1)
+    {
+        // Post-order traversal
+        std::stack<unsigned int> stack;
+        std::stack<unsigned int> output;
+        stack.push(i);
+
+        while (!stack.empty())
+        {
+            unsigned int node = stack.top();
+            stack.pop();
+            output.push(node);
+
+            auto [first, last] = getChildren(node);
+            for (unsigned int j = first; j <= last && j != static_cast<unsigned int>(-1); ++j)
+                stack.push(j);
+        }
+
+        while (!output.empty())
+        {
+            subtree.push_back(pImpl->SAlphaCompressed[output.top()]);
+            output.pop();
+        }
+    }
+    else if (order == 2)
+    {
+        // In-order traversal
+        std::stack<std::pair<unsigned int, bool>> stack;
+        stack.push({i, false});
+
+        while (!stack.empty())
+        {
+            auto [node, visited] = stack.top();
+            stack.pop();
+
+            if (visited)
+            {
+                subtree.push_back(pImpl->SAlphaCompressed[node]);
+            }
+            else
+            {
+                auto [first, last] = getChildren(node);
+                if (first != static_cast<unsigned int>(-1))
+                {
+                    for (unsigned int j = last; j >= first && j != static_cast<unsigned int>(-1); --j)
+                    {
+                        stack.push({j, false});
+                    }
+                }
+                stack.push({node, true});
+                if (first != static_cast<unsigned int>(-1))
+                {
+                    stack.push({first, false});
+                }
+            }
+        }
+    }
+    else
+        throw std::runtime_error("Error: invalid order");
+
+    return subtree;
+}
+
+/**
  * @brief Searches for the rannge of nodes whose upward path is prefixed by a given string reversed.
  *
  * This function searches for a subpath in the XBWT structure. It uses the compressed vectors
- * to determine the range of positions corresponding to the nodes whose upward path is prefixed 
+ * to determine the range of positions corresponding to the nodes whose upward path is prefixed
  * by a given string reversed.
  *
  * @param subPath The subpath to be searched for, represented as a string of labels.
@@ -1039,4 +1255,38 @@ std::pair<long int, long int> XBWT::subPathSearch(const std::string &subPath) co
     }
 
     return {first, last};
+}
+
+/**
+ * @brief Return the label associated with the node at index i in the XBWT structure.
+ *
+ * @param i Node index in the XBWT structure
+ * @return unsigned int Label associated with the node at index i
+ */
+unsigned int XBWT::getNodeLabel(unsigned int i) const
+{
+    return pImpl->SAlphaCompressed[i];
+}
+
+/**
+ * @brief Return the upward path (from root to parent node) of the node at index i
+ * in the XBWT structure.
+ *
+ * @param i Index of the node in the XBWT structure
+ * @return std::string Upward path from root to the node i parent node
+ */
+std::string XBWT::getUpwardPath(unsigned int i) const
+{
+    std::ostringstream oss;
+    auto parent = getParent(i);
+    while (parent != -1)
+    {
+        oss << getNodeLabel(parent);
+        parent = getParent(parent);
+    }
+
+    // return reversed oss string
+    std::string out = oss.str();
+    std::reverse(out.begin(), out.end());
+    return out;
 }
