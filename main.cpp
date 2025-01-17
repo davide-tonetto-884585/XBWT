@@ -74,8 +74,8 @@ int main()
 {
     // Stringa di input
     // string str = "(A(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c))))";
-    // string str = "(A(B(D(a))(a(a(b(c(b(c(b(c(b(x)(y)(z)))))(y)(z))))))(E(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b)))(B(D(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b)))(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b)))(b)))(C(D(c))(b)(D(c)))(B(D(b))))";
-    string str = "(a(b(c(b(c(b(c(b(x)(y)(z)))))(y)(z)))))";
+    string str = "(A(B(D(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c)))(a))(E(B(D(a))(a)(E(C(C(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c)))(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c)))(b)))(C(D(c))(b)(D(c)))(B(D(b)))(B(D(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b)))(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b)))(b)))(C(D(c))(b)(D(c)))(B(D(b))))";
+    // string str = "(a(b(c(b(c(b(c(b(x)(y)(z)))))(y)(z)))))";
     // string str = "(a(b(c(b(c(x)(y)(z))))))";
     // string str = "(1(2(1(2)(2(3)))(2)))";
 
@@ -123,6 +123,7 @@ int main()
     XBWT xbwt(tree, cardSigma, cardSigmaN, false, true, &intNodesPosSorted);
     string errors = "";
 
+    cout << "\n______________________________________________________" << endl;
     cout << "Testing construction of XBWT:" << endl;
     vector<unsigned int> testIntNodesPosSorted = xbwt.upwardStableSortConstruction(tree);
 
