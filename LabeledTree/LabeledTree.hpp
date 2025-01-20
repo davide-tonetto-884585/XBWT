@@ -8,6 +8,7 @@
 #include <stack>
 #include <sstream>
 #include <iostream>
+#include <functional>
 
 template <typename LabelType>
 class Node
@@ -106,9 +107,9 @@ public:
         root = new Node<LabelType>(rootLabel);
     }
 
-    LabeledTree(const std::string &str)
+    LabeledTree(const std::string &str, std::function<LabelType(const std::string &)> strToLabel)
     {
-        root = fromString(str);
+        root = fromString(str, strToLabel);
     }
 
     LabeledTree(Node<LabelType> *root) : root(root) {}
@@ -244,7 +245,7 @@ private:
         return true;
     }
 
-    Node<LabelType> *fromString(const std::string &str)
+    Node<LabelType> *fromString(const std::string &str, std::function<LabelType(const std::string &)> strToLabel)
     {
         unsigned int pos = 0;
         if (str.empty() || (!areParenthesesBalanced(str) || !isValidTree(str, pos)))
@@ -260,10 +261,23 @@ private:
 
         while (iss >> ch)
         {
-            if (isdigit(ch))
+            if (ch == '(')
             {
-                iss.putback(ch);
-                iss >> label;
+                // Do nothing, just continue
+            }
+            else if (ch == ')')
+            {
+                nodeStack.pop();
+            }
+            else
+            {
+                std::string labelStr = std::string(1, ch);
+                while (iss.peek() != '(' && iss.peek() != ')' && iss >> ch)
+                {
+                    label += ch;
+                }
+
+                LabelType label = strToLabel(labelStr);
                 if (nodeStack.empty())
                 {
                     currentNode = root = new Node<LabelType>(label);
@@ -275,14 +289,6 @@ private:
                     currentNode->pushBackChild(label);
                     nodeStack.push(currentNode->getChildren().back());
                 }
-            }
-            else if (ch == '(')
-            {
-                // Do nothing, just continue
-            }
-            else if (ch == ')')
-            {
-                nodeStack.pop();
             }
         }
 

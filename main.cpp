@@ -9,67 +9,6 @@
 
 using namespace std;
 
-std::map<std::string, unsigned int> labelToInt(std::vector<std::string> &labels)
-{
-    std::map<std::string, unsigned int> labelMap;
-
-    // sort the labels
-    std::sort(labels.begin(), labels.end());
-
-    unsigned int currentInt = 1;
-    for (const std::string &label : labels)
-    {
-        if (labelMap.find(label) == labelMap.end())
-        {
-            labelMap[label] = currentInt++;
-        }
-    }
-
-    return labelMap;
-}
-
-std::vector<std::string> getLabels(const std::string &str, unsigned int &cardSigma, unsigned int &cardSigmaN)
-{
-    std::vector<std::string> labels{};
-    std::vector<std::string> internalLabels{};
-    std::string label = "";
-    unsigned int i = 0;
-    for (char ch : str)
-    {
-        if (ch == '(' or ch == ')')
-        {
-            if (!label.empty())
-            {
-                // add the label to the vector if it is not already present
-                if (std::find(labels.begin(), labels.end(), label) == labels.end())
-                {
-                    labels.push_back(label);
-                    ++cardSigma;
-                }
-
-                if (!(ch == ')' and str[i - 2] == '('))
-                {
-                    if (std::find(internalLabels.begin(), internalLabels.end(), label) == internalLabels.end())
-                    {
-                        internalLabels.push_back(label);
-                        ++cardSigmaN;
-                    }
-                }
-
-                label = "";
-            }
-        }
-        else
-        {
-            label += ch;
-        }
-
-        ++i;
-    }
-
-    return labels;
-}
-
 int main()
 {
     // Stringa di input
@@ -81,46 +20,13 @@ int main()
 
     cout << "Input string: " << str << endl;
 
-    unsigned int cardSigma = 0;
-    unsigned int cardSigmaN = 0;
-    std::vector<std::string> labels = getLabels(str, cardSigma, cardSigmaN);
-
-    cout << "CardSigma: " << cardSigma << endl;
-    cout << "CardSigmaN: " << cardSigmaN << endl;
-
-    // Converte la stringa in una stringa di interi
-    std::map<std::string, unsigned int> labelToIntMap = labelToInt(labels);
-
-    // Stampa la mappa
-    std::cout << "Label to int map: " << std::endl;
-    for (const auto &pair : labelToIntMap)
-    {
-        std::cout << pair.first << " -> " << pair.second << std::endl;
-    }
-
-    std::string convertedStr = "";
-    for (char ch : str)
-    {
-        if (ch == '(' or ch == ')')
-        {
-            convertedStr += ch;
-        }
-        else
-        {
-            convertedStr += std::to_string(labelToIntMap[std::string(1, ch)]);
-        }
-    }
-
-    // Stampa la stringa convertita
-    std::cout << "Converted string: " << convertedStr << std::endl;
-
     // Crea l'albero etichettato utilizzando la stringa convertita
-    LabeledTree<unsigned int> tree(convertedStr);
+    LabeledTree<char> tree(str, [](const string &label) -> char { return label[0]; });
     cout << "Tree: " << tree.toString() << endl;
 
     // build an XBWT
     vector<unsigned int> intNodesPosSorted{};
-    XBWT xbwt(tree, cardSigma, cardSigmaN, false, true, &intNodesPosSorted);
+    XBWT<char> xbwt(tree, false, true, &intNodesPosSorted);
     string errors = "";
 
     cout << "\n______________________________________________________" << endl;
@@ -233,17 +139,18 @@ int main()
     for (unsigned int i = 0; i < treeSize; ++i)
     {
         auto upwardPath = xbwt.getUpwardPath(i);
-        cout << "Get upward path of " << i << ": " << upwardPath << endl;
+        cout << "Get upward path of " << i << ": " << string(upwardPath.begin(), upwardPath.end()) << endl;
 
         for (unsigned int j = 0; j < upwardPath.size(); ++j)
         {
-            auto subPathSearchResult = xbwt.subPathSearch(upwardPath.substr(j));
-            cout << "\tSubpath search of " << upwardPath.substr(j) << ": " << subPathSearchResult.first << " " << subPathSearchResult.second << endl;
+            std::vector<char> path(upwardPath.begin() + j, upwardPath.end());
+            auto subPathSearchResult = xbwt.subPathSearch(path);
+            cout << "\tSubpath search of " << std::string(upwardPath.begin() + j, upwardPath.end()) << ": " << subPathSearchResult.first << " " << subPathSearchResult.second << endl;
 
             for (unsigned int k = subPathSearchResult.first; k <= subPathSearchResult.second; ++k)
             {
                 auto checkUpwardPath = xbwt.getUpwardPath(k);
-                if (checkUpwardPath.find(upwardPath.substr(j)) == std::string::npos)
+                if (std::string(checkUpwardPath.begin(), checkUpwardPath.end()).find(std::string(upwardPath.begin() + j, upwardPath.end())) == std::string::npos)
                     errors += "Subpath search is not correct\n";
             }
         }
