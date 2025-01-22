@@ -58,8 +58,8 @@ private:
 
     // private methods for building the XBWT
     void createXBWT(const LabeledTree<T> &tree, bool usePathSort = true, bool verbose = false, std::vector<unsigned int> *intNodesPosSorted = nullptr);
-    std::vector<unsigned int> pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot = false, bool firstIt = true, unsigned int rem = 0) const;
-    std::vector<unsigned int> pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot = false, bool firstIt = false) const;
+    std::vector<unsigned int> pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot = false, bool firstIt = true, unsigned int rem = 0, bool j0Encountered = false) const;
+    std::vector<unsigned int> pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot = false, bool firstIt = false, bool j0Encountered = false) const;
     Node<unsigned int> *contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted = nullptr) const;
 
     template <typename U>
@@ -428,7 +428,7 @@ Node<unsigned int> *XBWT<T>::contractTree(std::vector<Triplet<unsigned int, int,
  * @return A merged vector of node positions sorted.
  */
 template <typename T>
-std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot, bool firstIt) const
+std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot, bool firstIt, bool j0Encountered) const
 {
     std::vector<unsigned int> merged(intNodesPosNotJSorted.size() + intNodesPosJSorted.size(), 0);
     std::vector<long int> firstIndexMerged(merged.size(), -1);
@@ -446,11 +446,28 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
 
                 if (v1 == v2)
                 {
-                    // as in stable sort keep the order of elements with the same value (in tempIntNodes)
-                    if (intNodesPosNotJSorted[i] < intNodesPosJSorted[j])
-                        merged[cont++] = intNodesPosNotJSorted[i++];
+                    // if same lv
+                    if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second == tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
+                    {
+                        if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes] ||
+                            !indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes])
+                            throw std::runtime_error("Error: index not found in merge");
+
+                        unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes];
+                        unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes];
+
+                        if (index1 > index2) // prima era >
+                            merged[cont++] = intNodesPosNotJSorted[i++];
+                        else
+                            merged[cont++] = intNodesPosJSorted[j++];
+                    }
                     else
-                        merged[cont++] = intNodesPosJSorted[j++];
+                    {
+                        if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second < tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
+                            merged[cont++] = intNodesPosNotJSorted[i++];
+                        else
+                            merged[cont++] = intNodesPosJSorted[j++];
+                    }
                 }
                 else if (v1 < v2)
                     merged[cont++] = intNodesPosNotJSorted[i++];
@@ -491,7 +508,7 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
                             {
                                 if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes] ||
                                     !indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes])
-                                    throw std::runtime_error("Error: index 2 not found in merge");
+                                    throw std::runtime_error("Error: index not found in merge");
 
                                 unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes];
                                 unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes];
@@ -528,11 +545,28 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
 
                 if (v1 == v2)
                 {
-                    // as in stable sort keep the order of elements with the same value (in tempIntNodes)
-                    if (intNodesPosNotJSorted[i] > intNodesPosJSorted[j])
-                        merged[cont++] = intNodesPosNotJSorted[i++];
+                    // if same lv
+                    if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second == tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
+                    {
+                        if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes] ||
+                            !indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes])
+                            throw std::runtime_error("Error: index x not found in merge");
+
+                        unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes];
+                        unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes];
+
+                        if (index1 > index2) // prima era >
+                            merged[cont++] = intNodesPosNotJSorted[i++];
+                        else
+                            merged[cont++] = intNodesPosJSorted[j++];
+                    }
                     else
-                        merged[cont++] = intNodesPosJSorted[j++];
+                    {
+                        if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second < tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
+                            merged[cont++] = intNodesPosNotJSorted[i++];
+                        else
+                            merged[cont++] = intNodesPosJSorted[j++];
+                    }
                 }
                 else if (v1 < v2)
                     merged[cont++] = intNodesPosNotJSorted[i++];
@@ -548,7 +582,7 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
                 {
                     if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes] ||
                         !indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes])
-                        throw std::runtime_error("Error: index 2 not found in merge");
+                        throw std::runtime_error("Error: index not found in merge");
 
                     unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes];
                     unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes];
@@ -592,10 +626,10 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
         merged.erase(merged.begin());
     }
 
-    /* std::cout << "Merged: " << std::endl;
+    std::cout << "Merged: " << std::endl;
     for (unsigned int i = 0; i < merged.size(); ++i)
         std::cout << merged[i] << " ";
-    std::cout << std::endl; */
+    std::cout << std::endl;
 
     return merged;
 }
@@ -615,7 +649,7 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
  * @return A vector of sorted node positions.
  */
 template <typename T>
-std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot, bool firstIt, unsigned int rem) const
+std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot, bool firstIt, unsigned int rem, bool j0Encountered) const
 {
     // get number of nodes at level j I {0, 1, 2} mode 3
     long int nodeLevelCounts[] = {0, 0, 0};
@@ -647,6 +681,7 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         }
     }
 
+    std::cout << "j: " << j << std::endl;
     assert(j != -1 && "Error: j value not found");
 
     unsigned int intNodesPosJSize = j == 0 ? nodeLevelCounts[j] + rem : nodeLevelCounts[j];
@@ -729,13 +764,15 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         else
             cTree.setRoot(contractTree(intNodes, j));
 
-        // std::cout << "cTree: " << cTree.toString() << std::endl;
+        std::cout << "intNodesPosNotJ size: " << intNodesPosNotJ.size() << std::endl;
+        std::cout << "cTree size: " << cTree.getNodes().size() << std::endl;
+        std::cout << "cTree: " << cTree.toString() << std::endl;
 
         ++rem;
         if (j == 0)
-            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), true, false, rem);
+            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), true, false, rem, true);
         else
-            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), false, false, rem);
+            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), false, false, rem, j0Encountered);
 
         if (j == 0)
         {
@@ -782,10 +819,10 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         }
     }
 
-    /* std::cout << "Int nodes pos not j sorted: " << std::endl;
+    std::cout << "Int nodes pos not j sorted: " << std::endl;
     for (unsigned int i = 0; i < intNodesPosNotJSorted.size(); ++i)
         std::cout << intNodesPosNotJSorted[i] << " ";
-    std::cout << std::endl; */
+    std::cout << std::endl;
 
     std::vector<Triplet<unsigned int, unsigned int, unsigned int>> pairIntNodesPosJSorted(intNodesPosJ.size(), Triplet<unsigned int, unsigned int, unsigned int>(0, 0, 0));
     short int c = 0;
@@ -838,12 +875,14 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         intNodesPosJSorted[i] = pairIntNodesPosJSorted[i].third;
     }
 
-    /* std::cout << "Int nodes pos j sorted: " << std::endl;
+    std::cout << "Int nodes pos j sorted: " << std::endl;
     for (unsigned int i = 0; i < intNodesPosJSorted.size(); ++i)
         std::cout << intNodesPosJSorted[i] << " ";
-    std::cout << std::endl; */
+    std::cout << std::endl;
 
-    return pathSortMerge(intNodesPosNotJSorted, firstIndex, indexFound, intNodesPosJSorted, tempIntNodes, numDummyNodes, j, dummyRoot, firstIt);
+    std::cout << "___________________________" << std::endl;
+
+    return pathSortMerge(intNodesPosNotJSorted, firstIndex, indexFound, intNodesPosJSorted, tempIntNodes, numDummyNodes, j, dummyRoot, firstIt, j0Encountered);
 }
 
 /**
