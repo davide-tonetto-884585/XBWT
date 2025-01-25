@@ -15,10 +15,11 @@ int main()
     bool verbose = true;
 
     // Stringa di input
-    string str = "(A(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b))))";
-    // string str = "(A(B(C(B(C(B(C(B(x)(y)(z)))))(y)(z)))))";
+    //string str = "(A(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b))))";
+    //string str = "(A(D(D(D(E(D(E(c)))(c)))(E(c)))(E(c))))";
+    string str = "(A(B(D(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c)))(a))(E(B(D(a))(a)(E(C(C(C(C(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c)))(b))(a)(B(a)))(D(E(c)))(D(B(a))(a)(B(c)))(b)))(C(D(c))(b)(D(c)))(B(D(b)))(B(D(B(D(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b)))(a))(a)(E(b)))(C(D(c))(b)(D(c)))(B(D(b)))(b)))(C(D(c))(b)(D(c)))(B(D(b))))";
+    // string str = "(A(B(C(B(C(B(C(B(a)(b)(c)))))(b)(c)))))";
     // string str = "(a(b(c(b(c(x)(y)(z))))))";
-    // string str = "(1(2(1(2)(2(3)))(2)))";
 
     if (verbose)
         cout << "Input string: " << str << endl;

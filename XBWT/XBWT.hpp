@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <iomanip>
 #include <unordered_map>
 #include <sdsl/rrr_vector.hpp>
 #include <sdsl/wt_int.hpp>
@@ -25,9 +26,14 @@ struct Triplet
 
     std::string join(const std::string &sep) const
     {
-        return std::to_string(first) + sep + std::to_string(second) + sep + std::to_string(third);
+        return first + sep + second + sep + third;
     }
 };
+
+std::string padLeft(const std::string &str, unsigned int num, char paddingChar = ' ')
+{
+    return std::string(num - str.size(), paddingChar) + str;
+}
 
 template <typename T>
 class XBWT
@@ -52,15 +58,16 @@ private:
 
         unsigned int cardSigma;
         unsigned int cardSigmaN;
+        unsigned int maxNumDigits;
     };
 
     std::unique_ptr<MyImpl> pImpl;
 
     // private methods for building the XBWT
     void createXBWT(const LabeledTree<T> &tree, bool usePathSort = true, bool verbose = false, std::vector<unsigned int> *intNodesPosSorted = nullptr);
-    std::vector<unsigned int> pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot = false, bool firstIt = true, unsigned int rem = 0, bool j0Encountered = false) const;
+    std::vector<unsigned int> pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot = false, bool firstIt = true, unsigned int rem = 0, bool j0Encountered = false, unsigned int maxNumDigits = 1) const;
     std::vector<unsigned int> pathSortMerge(std::vector<unsigned int> &intNodesPosNotJSorted, std::vector<unsigned int> &firstIndexIntNodesPosNotJSorted, std::vector<bool> &indexFoundIntNodesPosNotJSorted, std::vector<unsigned int> &intNodesPosJSorted, std::vector<Triplet<unsigned int, int, int>> &tempIntNodes, unsigned int numDummyNodes, short int jv, bool dummyRoot = false, bool firstIt = false, bool j0Encountered = false) const;
-    Node<unsigned int> *contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted = nullptr) const;
+    Node<unsigned int> *contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, unsigned int *maxNumDigits, std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> *tripletsSorted = nullptr) const;
 
     template <typename U>
     std::vector<Triplet<unsigned int, int, int>> computeIntNodes(const Node<U> &root, bool encode = false) const;
@@ -70,7 +77,7 @@ private:
     std::vector<long int> buildJ() const;
 
     // utility methods
-    void radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const;
+    void radixSort(std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> &arr) const;
 
 public:
     XBWT(const LabeledTree<T> &tree, bool usePathSort = true, bool verbose = false, std::vector<unsigned int> *intNodesPosSorted = nullptr);
@@ -139,14 +146,18 @@ XBWT<T>::XBWT(const LabeledTree<T> &tree, bool usePathSort, bool verbose, std::v
     std::sort(labels.begin(), labels.end());
 
     // update alphabet map values with codes
+    unsigned int maxNumDigits = 1;
     for (auto label : labels)
     {
         pImpl->alphabetMap[label] = pImpl->cardSigma++ + 1;
         pImpl->alphabetMapInv.emplace(pImpl->cardSigma, label);
+        if (std::to_string(pImpl->cardSigma).size() > maxNumDigits)
+            maxNumDigits = std::to_string(pImpl->cardSigma).size();
     }
 
     assert(pImpl->cardSigma == pImpl->alphabetMap.size());
     pImpl->cardSigmaN = cardSigmaN;
+    pImpl->maxNumDigits = maxNumDigits;
 
     if (verbose)
     {
@@ -176,11 +187,11 @@ XBWT<T>::~XBWT() = default;
  * @param arr The vector of pairs to be sorted.
  */
 template <typename T>
-void XBWT<T>::radixSort(std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr) const
+void XBWT<T>::radixSort(std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> &arr) const
 {
-    auto countSort = [](std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> &arr, unsigned int exp)
+    auto countSort = [](std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> &arr, unsigned int exp)
     {
-        std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> output(arr.size(), std::pair<unsigned int, Triplet<unsigned int, int, int>>(0, Triplet<unsigned int, int, int>(0, 0, 0)));
+        std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> output(arr.size(), std::pair<unsigned int, Triplet<std::string, std::string, std::string>>(0, Triplet<std::string, std::string, std::string>("", "", "")));
         std::vector<unsigned int> count(10, 0);
 
         for (const auto &pair : arr)
@@ -254,13 +265,13 @@ std::vector<unsigned int> XBWT<T>::upwardStableSortConstruction(const LabeledTre
     {
         std::ostringstream oss;
         auto parentNode = (*intNodes)[(*intNodes)[i].third - 1];
-        oss << parentNode.first;
+        oss << std::setfill('0') << std::setw(pImpl->maxNumDigits) << parentNode.first;
         do
         {
             if (parentNode.third != 0)
             {
                 parentNode = (*intNodes)[parentNode.third - 1];
-                oss << parentNode.first;
+                oss << std::setfill('0') << std::setw(pImpl->maxNumDigits) << parentNode.first;
             }
         } while (parentNode.third != 0);
 
@@ -335,12 +346,13 @@ std::vector<Triplet<unsigned int, int, int>> XBWT<T>::computeIntNodes(const Node
  * @return A pointer to the root node of the contracted tree.
  */
 template <typename T>
-Node<unsigned int> *XBWT<T>::contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> *tripletsSorted) const
+Node<unsigned int> *XBWT<T>::contractTree(std::vector<Triplet<unsigned int, int, int>> intNodes, short int j, unsigned int *maxNumDigits, std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> *tripletsSorted) const
 {
     if (tripletsSorted)
     {
         unsigned int newName = 2;
-        Triplet<unsigned int, int, int> &preTriplet = tripletsSorted->front().second;
+        *maxNumDigits = 1;
+        auto &preTriplet = tripletsSorted->front().second;
         for (auto &pair : *tripletsSorted)
         {
             if (pair.second.first != preTriplet.first || pair.second.second != preTriplet.second || pair.second.third != preTriplet.third)
@@ -350,6 +362,8 @@ Node<unsigned int> *XBWT<T>::contractTree(std::vector<Triplet<unsigned int, int,
             }
 
             intNodes[pair.first].first = newName;
+            if (std::to_string(newName).size() > *maxNumDigits)
+                *maxNumDigits = std::to_string(newName).size();
         }
     }
 
@@ -447,27 +461,27 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
                 if (v1 == v2)
                 {
                     // if same lv
-                    if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second == tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
-                    {
-                        if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes] ||
-                            !indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes])
-                            throw std::runtime_error("Error: index not found in merge");
+                    // if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second == tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
+                    // {
+                    if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes] ||
+                        !indexFoundIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes])
+                        throw std::runtime_error("Error: index not found in merge");
 
-                        unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes];
-                        unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes];
+                    unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third].third - numDummyNodes];
+                    unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third].third - numDummyNodes];
 
-                        if (index1 > index2) // prima era >
-                            merged[cont++] = intNodesPosNotJSorted[i++];
-                        else
-                            merged[cont++] = intNodesPosJSorted[j++];
-                    }
+                    if (index1 > index2) // prima era >
+                        merged[cont++] = intNodesPosNotJSorted[i++];
+                    else
+                        merged[cont++] = intNodesPosJSorted[j++];
+                    /*}
                     else
                     {
                         if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second < tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
                             merged[cont++] = intNodesPosNotJSorted[i++];
                         else
                             merged[cont++] = intNodesPosJSorted[j++];
-                    }
+                    }*/
                 }
                 else if (v1 < v2)
                     merged[cont++] = intNodesPosNotJSorted[i++];
@@ -539,34 +553,33 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
         {
             if (!firstIt)
             {
-                // TODO: check if this is correct
                 unsigned int v1 = tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].first;
                 unsigned int v2 = tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].first;
 
                 if (v1 == v2)
                 {
                     // if same lv
-                    if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second == tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
-                    {
-                        if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes] ||
-                            !indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes])
-                            throw std::runtime_error("Error: index x not found in merge");
+                    //  if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second == tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
+                    //  {
+                    if (!indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes] ||
+                        !indexFoundIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes])
+                        throw std::runtime_error("Error: index x not found in merge");
 
-                        unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes];
-                        unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes];
+                    unsigned int index1 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].third - numDummyNodes];
+                    unsigned int index2 = firstIndexIntNodesPosNotJSorted[tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].third - numDummyNodes];
 
-                        if (index1 > index2) // prima era >
-                            merged[cont++] = intNodesPosNotJSorted[i++];
-                        else
-                            merged[cont++] = intNodesPosJSorted[j++];
-                    }
+                    if (index1 > index2) // prima era >
+                        merged[cont++] = intNodesPosNotJSorted[i++];
+                    else
+                        merged[cont++] = intNodesPosJSorted[j++];
+                    /*}
                     else
                     {
                         if (tempIntNodes[intNodesPosNotJSorted[i] + numDummyNodes].second < tempIntNodes[intNodesPosJSorted[j] + numDummyNodes].second)
                             merged[cont++] = intNodesPosNotJSorted[i++];
                         else
                             merged[cont++] = intNodesPosJSorted[j++];
-                    }
+                    } */
                 }
                 else if (v1 < v2)
                     merged[cont++] = intNodesPosNotJSorted[i++];
@@ -626,10 +639,10 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
         merged.erase(merged.begin());
     }
 
-    std::cout << "Merged: " << std::endl;
+    /* std::cout << "Merged: " << std::endl;
     for (unsigned int i = 0; i < merged.size(); ++i)
         std::cout << merged[i] << " ";
-    std::cout << std::endl;
+    std::cout << std::endl; */
 
     return merged;
 }
@@ -649,7 +662,7 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
  * @return A vector of sorted node positions.
  */
 template <typename T>
-std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot, bool firstIt, unsigned int rem, bool j0Encountered) const
+std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned int, int, int>> &intNodes, bool dummyRoot, bool firstIt, unsigned int rem, bool j0Encountered, unsigned int maxNumDigits) const
 {
     // get number of nodes at level j I {0, 1, 2} mode 3
     long int nodeLevelCounts[] = {0, 0, 0};
@@ -726,19 +739,19 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         }
     }
 
-    std::vector<std::pair<unsigned int, Triplet<unsigned int, int, int>>> tripletsToSort(intNodesPosNotJ.size(), std::pair<unsigned int, Triplet<unsigned int, int, int>>(0, Triplet<unsigned int, int, int>(0, 0, 0)));
+    std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> tripletsToSort(intNodesPosNotJ.size(), std::pair<unsigned int, Triplet<std::string, std::string, std::string>>(0, Triplet<std::string, std::string, std::string>("", "", "")));
     for (unsigned int i = 0; i < intNodesPosNotJ.size(); ++i)
     {
         auto index = intNodesPosNotJ[i] + numDummyNodes;
         tripletsToSort[i].first = intNodesPosNotJ[i];
 
-        tripletsToSort[i].second.first = tempIntNodes[tempIntNodes[index].third].first;
+        tripletsToSort[i].second.first = padLeft(std::to_string(tempIntNodes[tempIntNodes[index].third].first), maxNumDigits, '0');
         index = tempIntNodes[index].third;
 
-        tripletsToSort[i].second.second = tempIntNodes[tempIntNodes[index].third].first;
+        tripletsToSort[i].second.second = padLeft(std::to_string(tempIntNodes[tempIntNodes[index].third].first), maxNumDigits, '0');
         index = tempIntNodes[index].third;
 
-        tripletsToSort[i].second.third = tempIntNodes[tempIntNodes[index].third].first;
+        tripletsToSort[i].second.third = padLeft(std::to_string(tempIntNodes[tempIntNodes[index].third].first), maxNumDigits, '0');
     }
 
     radixSort(tripletsToSort);
@@ -760,25 +773,76 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
     {
         LabeledTree<unsigned int> cTree;
         if (firstIt)
-            cTree.setRoot(contractTree(intNodes, j, &tripletsToSort));
+            cTree.setRoot(contractTree(intNodes, j, &maxNumDigits, &tripletsToSort));
         else
-            cTree.setRoot(contractTree(intNodes, j));
-
-        std::cout << "intNodesPosNotJ size: " << intNodesPosNotJ.size() << std::endl;
-        std::cout << "cTree size: " << cTree.getNodes().size() << std::endl;
-        std::cout << "cTree: " << cTree.toString() << std::endl;
+            cTree.setRoot(contractTree(intNodes, j, &maxNumDigits));
 
         ++rem;
         if (j == 0)
-            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), true, false, rem, true);
+            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), true, false, rem, true, maxNumDigits);
         else
-            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), false, false, rem, j0Encountered);
+            intNodesPosNotJSorted = pathSort(computeIntNodes<unsigned int>(*cTree.getRoot()), false, false, rem, j0Encountered, maxNumDigits);
+
+        /* std::vector<Triplet<unsigned int, int, int>> localIntNodes = computeIntNodes<unsigned int>(*cTree.getRoot());
+        std::vector<std::pair<unsigned int, std::string>> intNodesPaths;
+        intNodesPaths.push_back(std::pair<unsigned int, std::string>(0, ""));
+        for (unsigned int i = 1; i < localIntNodes.size(); ++i)
+        {
+            std::ostringstream oss;
+            auto parentNode = localIntNodes[localIntNodes[i].third - 1];
+            oss << std::setfill('0') << std::setw(maxNumDigits) << localIntNodes[i].first;
+            oss << std::setfill('0') << std::setw(maxNumDigits) << parentNode.first;
+            do
+            {
+                if (parentNode.third != 0)
+                {
+                    parentNode = localIntNodes[parentNode.third - 1];
+                    oss << std::setfill('0') << std::setw(maxNumDigits) << parentNode.first;
+                }
+            } while (parentNode.third != 0);
+
+            intNodesPaths.push_back(std::pair<unsigned int, std::string>(i, oss.str()));
+        }
+
+        std::stable_sort(intNodesPaths.begin(), intNodesPaths.end(), [&maxNumDigits](const std::pair<unsigned int, std::string> &a, const std::pair<unsigned int, std::string> &b)
+                         {
+            if (a.second.substr(0, maxNumDigits) == b.second.substr(0, maxNumDigits))
+            {
+                std::string aStr = a.second.substr(maxNumDigits);
+                std::string bStr = b.second.substr(maxNumDigits);
+
+                return aStr < bStr; 
+            } 
+            else 
+            {
+                return a.second.substr(0, maxNumDigits) < b.second.substr(0, maxNumDigits);
+            } });
+
+        std::vector<unsigned int> intNodesPosSorted(intNodesPaths.size(), 0);
+        std::cout << "Int nodes pos sorted correctly: " << std::endl;
+        if (j == 0)
+            intNodesPaths.erase(intNodesPaths.begin());
+        for (unsigned int i = 0; i < intNodesPaths.size(); ++i)
+        {
+            // intNodesPosNotJSorted[i] = intNodesPaths[i].first;
+            std::cout << intNodesPaths[i].first << " " << intNodesPaths[i].second << std::endl;
+        }
+        std::cout << std::endl;
+
+        std::cout << "intNodesPosNotJ size: " << intNodesPosNotJ.size() << std::endl;
+        std::cout << "cTree size: " << cTree.getNodes().size() << std::endl;
+        std::cout << "cTree: " << cTree.toString() << std::endl; */
 
         if (j == 0)
         {
             for (auto &el : intNodesPosNotJSorted)
                 --el;
         }
+
+        /* std::cout << "Int nodes pos not j sorted corr: " << std::endl;
+        for (unsigned int i = 0; i < intNodesPosNotJSorted.size(); ++i)
+            std::cout << intNodesPosNotJSorted[i] << " ";
+        std::cout << std::endl; */
     }
     else if (!notUnique && firstIt)
     {
@@ -875,12 +939,12 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         intNodesPosJSorted[i] = pairIntNodesPosJSorted[i].third;
     }
 
-    std::cout << "Int nodes pos j sorted: " << std::endl;
+    /* std::cout << "Int nodes pos j sorted: " << std::endl;
     for (unsigned int i = 0; i < intNodesPosJSorted.size(); ++i)
         std::cout << intNodesPosJSorted[i] << " ";
     std::cout << std::endl;
 
-    std::cout << "___________________________" << std::endl;
+    std::cout << "___________________________" << std::endl; */
 
     return pathSortMerge(intNodesPosNotJSorted, firstIndex, indexFound, intNodesPosJSorted, tempIntNodes, numDummyNodes, j, dummyRoot, firstIt, j0Encountered);
 }
@@ -904,7 +968,7 @@ void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verb
     std::vector<unsigned int> posIntNodesSorted;
     std::vector<Triplet<unsigned int, int, int>> intNodes = computeIntNodes(*tree.getRoot(), true);
     if (usePathSort)
-        posIntNodesSorted = pathSort(intNodes);
+        posIntNodesSorted = pathSort(intNodes, false, true, 0, false, pImpl->maxNumDigits);
     else
         posIntNodesSorted = upwardStableSortConstruction(tree, &intNodes);
 
