@@ -49,6 +49,16 @@ public:
         return level;
     }
 
+    unsigned int getDepth() const
+    {
+        unsigned int maxDepth = 0;
+        for (const auto &child : children)
+        {
+            maxDepth = std::max(maxDepth, child->getDepth());
+        }
+        return maxDepth + 1;
+    }
+
     LabelType getLabel() const
     {
         return label;
@@ -141,6 +151,11 @@ public:
     Node<LabelType> *getRoot() const
     {
         return root;
+    }
+
+    unsigned int getDepth() const
+    {
+        return root ? root->getDepth() : 0;
     }
 
     void setRoot(Node<LabelType> *newRoot)
@@ -256,9 +271,7 @@ private:
         std::stack<Node<LabelType> *> nodeStack;
         std::istringstream iss(str);
         char ch;
-        LabelType label;
         Node<LabelType> *currentNode, *root = nullptr;
-
         while (iss >> ch)
         {
             if (ch == '(')
@@ -274,7 +287,7 @@ private:
                 std::string labelStr = std::string(1, ch);
                 while (iss.peek() != '(' && iss.peek() != ')' && iss >> ch)
                 {
-                    label += ch;
+                    labelStr += ch;
                 }
 
                 LabelType label = strToLabel(labelStr);

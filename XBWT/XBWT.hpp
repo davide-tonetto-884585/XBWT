@@ -161,12 +161,6 @@ XBWT<T>::XBWT(const LabeledTree<T> &tree, bool usePathSort, bool verbose, std::v
 
     if (verbose)
     {
-        std::cout << "Alphabet map:" << std::endl;
-        for (const auto &[label, code] : pImpl->alphabetMap)
-        {
-            std::cout << label << " -> " << code << std::endl;
-        }
-
         std::cout << "Cardinality of the alphabet: " << pImpl->cardSigma << std::endl;
         std::cout << "Cardinality of the internal alphabet: " << pImpl->cardSigmaN << std::endl;
     }
@@ -189,14 +183,14 @@ XBWT<T>::~XBWT() = default;
 template <typename T>
 void XBWT<T>::radixSort(std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> &arr) const
 {
-    auto countSort = [](std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> &arr, unsigned int exp)
+    auto countSort = [](std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> &arr, size_t exp)
     {
         std::vector<std::pair<unsigned int, Triplet<std::string, std::string, std::string>>> output(arr.size(), std::pair<unsigned int, Triplet<std::string, std::string, std::string>>(0, Triplet<std::string, std::string, std::string>("", "", "")));
         std::vector<unsigned int> count(10, 0);
 
         for (const auto &pair : arr)
         {
-            unsigned int val = std::stoi(pair.second.join(""));
+            size_t val = static_cast<size_t>(std::stoull(pair.second.join("")));
             ++count[(val / exp) % 10];
         }
 
@@ -205,31 +199,31 @@ void XBWT<T>::radixSort(std::vector<std::pair<unsigned int, Triplet<std::string,
             count[i] += count[i - 1];
         }
 
-        for (int i = arr.size() - 1; i >= 0; --i)
+        for (long long int i = arr.size() - 1; i >= 0; --i)
         {
-            unsigned int val = std::stoi(arr[i].second.join(""));
+            size_t val = static_cast<size_t>(std::stoull(arr[i].second.join("")));
             output[count[(val / exp) % 10] - 1] = arr[i];
             --count[(val / exp) % 10];
         }
 
-        for (unsigned int i = 0; i < arr.size(); ++i)
+        for (long long int i = 0; i < arr.size(); ++i)
         {
             arr[i] = output[i];
         }
     };
 
     // TODO: check if this is valid for big integers
-    unsigned int max = std::stoi(arr[0].second.join(""));
+    size_t max = static_cast<size_t>(std::stoull(arr[0].second.join("")));
     for (const auto &el : arr)
     {
-        unsigned int val = std::stoi(el.second.join(""));
+        size_t val = static_cast<size_t>(std::stoull(el.second.join("")));
         if (val > max)
         {
             max = val;
         }
     }
 
-    for (unsigned int exp = 1; max / exp > 0; exp *= 10)
+    for (size_t exp = 1; max / exp > 0; exp *= 10)
     {
         countSort(arr, exp);
     }
@@ -694,7 +688,7 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         }
     }
 
-    std::cout << "j: " << j << std::endl;
+    // std::cout << "j: " << j << std::endl;
     assert(j != -1 && "Error: j value not found");
 
     unsigned int intNodesPosJSize = j == 0 ? nodeLevelCounts[j] + rem : nodeLevelCounts[j];
@@ -883,10 +877,10 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
         }
     }
 
-    std::cout << "Int nodes pos not j sorted: " << std::endl;
+    /* std::cout << "Int nodes pos not j sorted: " << std::endl;
     for (unsigned int i = 0; i < intNodesPosNotJSorted.size(); ++i)
         std::cout << intNodesPosNotJSorted[i] << " ";
-    std::cout << std::endl;
+    std::cout << std::endl; */
 
     std::vector<Triplet<unsigned int, unsigned int, unsigned int>> pairIntNodesPosJSorted(intNodesPosJ.size(), Triplet<unsigned int, unsigned int, unsigned int>(0, 0, 0));
     short int c = 0;
@@ -1056,6 +1050,15 @@ void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verb
         std::cout << "A compressed size: " << sdsl::size_in_bytes(pImpl->ACompressed) << " B" << std::endl;
         std::cout << "SigmaN size: " << sdsl::size_in_bytes(SigmaN) << " B" << std::endl;
         std::cout << "SigmaN compressed size: " << sdsl::size_in_bytes(pImpl->SigmaNCompressed) << " B" << std::endl;
+    
+        // Compute and print compression ratio
+        double originalSize = sdsl::size_in_bytes(SLast) + sdsl::size_in_bytes(tempSAlpha) + sdsl::size_in_bytes(SAlphaBit) + sdsl::size_in_bytes(A) + sdsl::size_in_bytes(SigmaN);
+        double compressedSize = sdsl::size_in_bytes(pImpl->SLastCompressed) + sdsl::size_in_bytes(pImpl->SAlphaCompressed) + sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) + sdsl::size_in_bytes(pImpl->ACompressed) + sdsl::size_in_bytes(pImpl->SigmaNCompressed);
+        double compressionRatio = (1 - (compressedSize / originalSize)) * 100;
+
+        std::cout << "Original size: " << originalSize << " B" << std::endl;
+        std::cout << "Compressed size: " << compressedSize << " B" << std::endl;
+        std::cout << "Space saving: " << compressionRatio << "%" << std::endl;
     }
 }
 

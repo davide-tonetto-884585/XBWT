@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Set optimization flags for efficiency
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -mtune=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -mtune=native")
 
 # Add the XBWT library
 add_library(XBWT_lib XBWT/XBWT.cpp XBWT/XBWT.hpp)
@@ -20,7 +20,8 @@ add_library(LabeledTree_lib LabeledTree/LabeledTree.cpp LabeledTree/LabeledTree.
 # add_library(HashTable_lib HashTable/HashTable.cpp HashTable/HashTable.hpp)
 
 # Add the executable
-add_executable(XBWT main.cpp)
+# add_executable(XBWT main.cpp)
+add_executable(XBWT experiments.cpp)
 
 # Link the XBWT library to the executable
 target_link_libraries(XBWT PRIVATE XBWT_lib)
