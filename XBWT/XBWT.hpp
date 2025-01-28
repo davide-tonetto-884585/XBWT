@@ -1052,8 +1052,8 @@ void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verb
         std::cout << "SigmaN compressed size: " << sdsl::size_in_bytes(pImpl->SigmaNCompressed) << " B" << std::endl;
     
         // Compute and print compression ratio
-        double originalSize = sdsl::size_in_bytes(SLast) + sdsl::size_in_bytes(tempSAlpha) + sdsl::size_in_bytes(SAlphaBit) + sdsl::size_in_bytes(A) + sdsl::size_in_bytes(SigmaN);
-        double compressedSize = sdsl::size_in_bytes(pImpl->SLastCompressed) + sdsl::size_in_bytes(pImpl->SAlphaCompressed) + sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) + sdsl::size_in_bytes(pImpl->ACompressed) + sdsl::size_in_bytes(pImpl->SigmaNCompressed);
+        double originalSize = sdsl::size_in_bytes(SLast) + sdsl::size_in_bytes(tempSAlpha) + sdsl::size_in_bytes(SAlphaBit);
+        double compressedSize = sdsl::size_in_bytes(pImpl->SLastCompressed) + sdsl::size_in_bytes(pImpl->SAlphaCompressed) + sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) + sdsl::size_in_bytes(pImpl->ACompressed);
         double compressionRatio = (1 - (compressedSize / originalSize)) * 100;
 
         std::cout << "Original size: " << originalSize << " B" << std::endl;
