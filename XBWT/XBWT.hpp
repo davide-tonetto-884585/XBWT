@@ -1040,6 +1040,15 @@ void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verb
             std::cout << "(" << i << ", " << (pImpl->SLastCompressed[i] ? "1" : "0") << ", " << pImpl->SAlphaCompressed[i] << ", " << (pImpl->SAlphaBitCompressed[i] ? "1" : "0") << ", " << pImpl->ACompressed[i] << ") " << std::endl;
         }
 
+        // compress int_vectors
+        sdsl::vlc_vector<> vv(tempSAlpha);
+        std::cout << "SAlpha vv size: " << sdsl::size_in_bytes(vv) << " B" << std::endl;
+
+        // build wt_int with non compressed bit vectors
+        sdsl::wt_int<> wt;
+        sdsl::construct_im(wt, tempSAlpha);
+        std::cout << "SAlpha wt size: " << sdsl::size_in_bytes(wt) << " B" << std::endl;        
+
         std::cout << "SLast size: " << sdsl::size_in_bytes(SLast) << " B" << std::endl;
         std::cout << "SLast compressed size: " << sdsl::size_in_bytes(pImpl->SLastCompressed) << " B" << std::endl;
         std::cout << "SAlpha size: " << sdsl::size_in_bytes(tempSAlpha) << " B" << std::endl;
@@ -1052,7 +1061,7 @@ void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verb
         std::cout << "SigmaN compressed size: " << sdsl::size_in_bytes(pImpl->SigmaNCompressed) << " B" << std::endl;
     
         // Compute and print compression ratio
-        double originalSize = sdsl::size_in_bytes(SLast) + sdsl::size_in_bytes(tempSAlpha) + sdsl::size_in_bytes(SAlphaBit);
+        double originalSize = sdsl::size_in_bytes(wt) + sdsl::size_in_bytes(SAlphaBit);
         double compressedSize = sdsl::size_in_bytes(pImpl->SLastCompressed) + sdsl::size_in_bytes(pImpl->SAlphaCompressed) + sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) + sdsl::size_in_bytes(pImpl->ACompressed);
         double compressionRatio = (1 - (compressedSize / originalSize)) * 100;
 
