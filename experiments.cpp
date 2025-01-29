@@ -17,7 +17,7 @@ int main()
     // Stringa di input
     // Read input string from file
     string str;
-    ifstream inputFile("/home/dvdxl/Scrivania/AMD_project/XBWT/tree_900000.txt");
+    ifstream inputFile("./tree_900000.txt");
     if (inputFile.is_open())
     {
         getline(inputFile, str);
@@ -51,7 +51,7 @@ int main()
     vector<unsigned int> testIntNodesPosSorted{};
 
     // Measure time for XBWT construction
-    /*double total_time = 0.0;
+    double total_time = 0.0;
     const int num_iterations = 10;
     for (int i = 0; i < num_iterations; ++i) {
         auto start = chrono::high_resolution_clock::now();
@@ -75,7 +75,7 @@ int main()
     }
 
     average_time = total_time / num_iterations;
-    cout << "Average construction time (no pathSort): " << average_time << " ms" << endl; */
+    cout << "Average construction time (no pathSort): " << average_time << " ms" << endl;
 
 
     XBWT<unsigned int> xbwt(tree, true, verbose, &intNodesPosSorted);
