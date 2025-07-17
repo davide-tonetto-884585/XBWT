@@ -2,7 +2,6 @@
 #define LABELEDTREE_HPP
 
 #include <vector>
-#include <optional>
 #include <memory>
 #include <string>
 #include <stack>
@@ -69,9 +68,9 @@ public:
         return children;
     }
 
-    std::optional<Node *> getParent() const
+    Node * getParent() const
     {
-        return parent ? std::optional<Node *>(parent) : std::nullopt;
+        return parent;
     }
 
     bool isRightmost() const

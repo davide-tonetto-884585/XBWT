@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <chrono>
 
-#include "LabeledTree/LabeledTree.hpp"
-#include "XBWT/XBWT.hpp"
+#include <LabeledTree.hpp>
+#include <XBWT.hpp>
 
 using namespace std;
 

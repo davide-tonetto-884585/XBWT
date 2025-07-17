@@ -1,43 +1,55 @@
-cmake_minimum_required(VERSION 3.10)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.13)
+# Set minimum policy version to handle compatibility issues
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
-# Set the project name
-project(XBWT)
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
-# Set the C++ standard
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+# Set a default build type if none was specified
+# ------------------------------------------------------------------------------
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
 
+# About this project
+# ------------------------------------------------------------------------------
+project (STPD-index)
+SET(VERSION_MAJOR "1")
+SET(VERSION_MINOR "0")
+SET(VERSION_PATCH "0")
+SET(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
-# Set optimization flags for efficiency
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -lm -march=native -mtune=native")
+# Set environment
+# ------------------------------------------------------------------------------
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install)
 
-# Add the XBWT library
-add_library(XBWT_lib XBWT/XBWT.cpp XBWT/XBWT.hpp)
+find_package(Git)
+if(GIT_FOUND)
+    message("git found: ${GIT_EXECUTABLE}")
+else()
+    message(WARNING "git not found. Cloning of submodules will not work.")
+endif()
 
-# Add the LabeledTree library
-add_library(LabeledTree_lib LabeledTree/LabeledTree.cpp LabeledTree/LabeledTree.hpp)
+# Configure the compiler with the appropriate flags
+# ------------------------------------------------------------------------------
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+  # using Clang
+  message("compiler: configuring Clang compiler")
+  include(ConfigureCompilerClang)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  # using GCC
+  message("compiler: configuring gcc compiler")
+  include(ConfigureCompilerGcc)
+else ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  message(FATAL_ERROR "Only the compiler gcc and clang are supported")
+endif()
 
-# Add the HashTable library
-# add_library(HashTable_lib HashTable/HashTable.cpp HashTable/HashTable.hpp)
+# Configure external resources
+# ------------------------------------------------------------------------------
+set(CMAKE_INSTALL_INCLUDEDIR "include")
+add_subdirectory(external)
 
-# Add the executable
-# add_executable(XBWT main.cpp)
-add_executable(XBWT experiments.cpp)
-
-# Link the XBWT library to the executable
-target_link_libraries(XBWT PRIVATE XBWT_lib)
-
-# Link the LabeledTree library to the executable
-target_link_libraries(XBWT PRIVATE LabeledTree_lib)
-
-# Link the HashTable library to the executable
-# target_link_libraries(XBWT PRIVATE HashTable_lib)
-
-target_link_libraries(XBWT PRIVATE sdsl)
-
-# Enable testing
-enable_testing()
-
-# Add a test using Valgrind
-add_test(NAME memcheck
-    COMMAND valgrind --leak-check=full --error-exitcode=1 $<TARGET_FILE:XBWT>)
+# Configure internal resources
+# ------------------------------------------------------------------------------
+add_subdirectory(include)
+add_subdirectory(sources)

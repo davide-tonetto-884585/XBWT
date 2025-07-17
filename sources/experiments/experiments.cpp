@@ -4,20 +4,29 @@
 #include <map>
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 
-#include "LabeledTree/LabeledTree.hpp"
-#include "XBWT/XBWT.hpp"
+#include <LabeledTree.hpp>
+#include <XBWT.hpp>
 
 using namespace std;
 
-int main()
+int main(int argc, char* argv[])
 {
     bool verbose = true;
 
-    // Stringa di input
+    // Check if file path is provided as command line argument
+    if (argc != 2) {
+        cerr << "Usage: " << argv[0] << " <input_file_path>" << endl;
+        cerr << "Example: " << argv[0] << " ../tree_5000.txt" << endl;
+        return 1;
+    }
+
+    string filename = argv[1];
+
     // Read input string from file
     string str;
-    ifstream inputFile("./tree_900000.txt");
+    ifstream inputFile(filename);
     if (inputFile.is_open())
     {
         getline(inputFile, str);
@@ -25,11 +34,12 @@ int main()
     }
     else
     {
-        cerr << "Unable to open file";
+        cerr << "Unable to open file: " << filename << endl;
         return 1;
     }
 
     if (verbose)
+        cout << "Input file: " << filename << endl;
         cout << "Input string: " << str << endl;
 
     auto start = chrono::high_resolution_clock::now();
