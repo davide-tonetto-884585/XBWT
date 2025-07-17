@@ -1,6 +1,7 @@
 #ifndef XBWT_HPP
 #define XBWT_HPP
 
+#include <cmath>
 #include <memory>
 #include <vector>
 #include <string>
@@ -130,31 +131,63 @@ XBWT<T>::XBWT(const LabeledTree<T> &tree, bool usePathSort, bool verbose, std::v
     }
 
     unsigned int cardSigmaN = 0;
-    std::vector<T> labels;
+    std::vector<T> internalLabels;
+    std::vector<T> leafLabels;
+    
+    // Separate internal node labels from leaf labels
     for (const auto &node : nodes)
     {
-        auto res = pImpl->alphabetMap.emplace(node->getLabel(), 0);
-        if (res.second)
+        if (node->isLeaf())
         {
-            labels.push_back(node->getLabel());
-            if (!node->isLeaf())
+            auto res = pImpl->alphabetMap.find(node->getLabel());
+            if (res == pImpl->alphabetMap.end())
+            {
+                leafLabels.push_back(node->getLabel());
+                pImpl->alphabetMap.emplace(node->getLabel(), 0); // placeholder
+            }
+        }
+        else
+        {
+            auto res = pImpl->alphabetMap.find(node->getLabel());
+            if (res == pImpl->alphabetMap.end())
+            {
+                internalLabels.push_back(node->getLabel());
+                pImpl->alphabetMap.emplace(node->getLabel(), 0); // placeholder
                 ++cardSigmaN;
+            }
         }
     }
 
-    // sort labels
-    std::sort(labels.begin(), labels.end());
+    // Sort both label sets to maintain natural order within each group
+    std::sort(internalLabels.begin(), internalLabels.end());
+    std::sort(leafLabels.begin(), leafLabels.end());
 
-    // update alphabet map values with codes
+    // Assign codes: internal nodes get 1, 2, 3, ..., cardSigmaN
+    // Leaf nodes get cardSigmaN+1, cardSigmaN+2, ..., cardSigma
     unsigned int maxNumDigits = 1;
-    for (auto label : labels)
+    unsigned int code = 1;
+    
+    // First assign codes to internal nodes
+    for (auto label : internalLabels)
     {
-        pImpl->alphabetMap[label] = pImpl->cardSigma++ + 1;
-        pImpl->alphabetMapInv.emplace(pImpl->cardSigma, label);
-        if (std::to_string(pImpl->cardSigma).size() > maxNumDigits)
-            maxNumDigits = std::to_string(pImpl->cardSigma).size();
+        pImpl->alphabetMap[label] = code;
+        pImpl->alphabetMapInv.emplace(code, label);
+        if (std::to_string(code).size() > maxNumDigits)
+            maxNumDigits = std::to_string(code).size();
+        ++code;
     }
-
+    
+    // Then assign codes to leaf nodes (ensuring they're greater than internal nodes)
+    for (auto label : leafLabels)
+    {
+        pImpl->alphabetMap[label] = code;
+        pImpl->alphabetMapInv.emplace(code, label);
+        if (std::to_string(code).size() > maxNumDigits)
+            maxNumDigits = std::to_string(code).size();
+        ++code;
+    }
+    
+    pImpl->cardSigma = code - 1; // Total number of labels
     assert(pImpl->cardSigma == pImpl->alphabetMap.size());
     pImpl->cardSigmaN = cardSigmaN;
     pImpl->maxNumDigits = maxNumDigits;
@@ -672,7 +705,7 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
     if (rem > 0)
     {
         long double realSize = (static_cast<long int>(intNodes.size()) - rem) / 3.;
-        x = static_cast<long int>(std::ceill(realSize));
+        x = static_cast<long int>(std::ceil(realSize));
     }
     else
         x = static_cast<long int>(std::ceil(static_cast<long int>(intNodes.size()) / 3.0));

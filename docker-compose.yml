@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  xbwt-dev:
+    build: .
+    ports:
+      - "2222:22"  # Map host port 2222 to container port 22
+    volumes:
+      - .:/app
+    stdin_open: true
+    tty: true
+    cap_add:
+      - SYS_PTRACE  # Required for debugging
+    security_opt:
+      - seccomp:unconfined  # Required for debugging
