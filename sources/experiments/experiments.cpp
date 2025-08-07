@@ -13,7 +13,7 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    bool verbose = true;
+    bool verbose = false;
 
     // Check if file path is provided as command line argument
     if (argc != 2) {
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 
     // Measure time for XBWT construction
     double total_time = 0.0;
-    const int num_iterations = 10;
+    const int num_iterations = 1;
     for (int i = 0; i < num_iterations; ++i) {
         auto start = chrono::high_resolution_clock::now();
         XBWT<unsigned int> xbwt(tree, true, false);
@@ -86,7 +86,6 @@ int main(int argc, char* argv[])
 
     average_time = total_time / num_iterations;
     cout << "Average construction time (no pathSort): " << average_time << " ms" << endl;
-
 
     XBWT<unsigned int> xbwt(tree, true, verbose, &intNodesPosSorted);
     XBWT<unsigned int> xbwt2(tree, false, false, &testIntNodesPosSorted);

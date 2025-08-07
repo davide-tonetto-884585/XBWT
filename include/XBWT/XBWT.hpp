@@ -57,6 +57,9 @@ private:
         std::unordered_map<T, unsigned int> alphabetMap;
         std::unordered_map<unsigned int, T> alphabetMapInv;
 
+        std::unordered_map<T, unsigned int> alphabetMapLeaves;
+        std::unordered_map<unsigned int, T> alphabetMapLeavesInv;
+
         unsigned int cardSigma;
         unsigned int cardSigmaN;
         unsigned int maxNumDigits;
@@ -133,17 +136,17 @@ XBWT<T>::XBWT(const LabeledTree<T> &tree, bool usePathSort, bool verbose, std::v
     unsigned int cardSigmaN = 0;
     std::vector<T> internalLabels;
     std::vector<T> leafLabels;
-    
+
     // Separate internal node labels from leaf labels
     for (const auto &node : nodes)
     {
         if (node->isLeaf())
         {
-            auto res = pImpl->alphabetMap.find(node->getLabel());
-            if (res == pImpl->alphabetMap.end())
+            auto res = pImpl->alphabetMapLeaves.find(node->getLabel());
+            if (res == pImpl->alphabetMapLeaves.end())
             {
                 leafLabels.push_back(node->getLabel());
-                pImpl->alphabetMap.emplace(node->getLabel(), 0); // placeholder
+                pImpl->alphabetMapLeaves.emplace(node->getLabel(), 0); // placeholder
             }
         }
         else
@@ -166,7 +169,7 @@ XBWT<T>::XBWT(const LabeledTree<T> &tree, bool usePathSort, bool verbose, std::v
     // Leaf nodes get cardSigmaN+1, cardSigmaN+2, ..., cardSigma
     unsigned int maxNumDigits = 1;
     unsigned int code = 1;
-    
+
     // First assign codes to internal nodes
     for (auto label : internalLabels)
     {
@@ -176,19 +179,19 @@ XBWT<T>::XBWT(const LabeledTree<T> &tree, bool usePathSort, bool verbose, std::v
             maxNumDigits = std::to_string(code).size();
         ++code;
     }
-    
+
     // Then assign codes to leaf nodes (ensuring they're greater than internal nodes)
     for (auto label : leafLabels)
     {
-        pImpl->alphabetMap[label] = code;
-        pImpl->alphabetMapInv.emplace(code, label);
+        pImpl->alphabetMapLeaves[label] = code;
+        pImpl->alphabetMapLeavesInv.emplace(code, label);
         if (std::to_string(code).size() > maxNumDigits)
             maxNumDigits = std::to_string(code).size();
         ++code;
     }
-    
+
     pImpl->cardSigma = code - 1; // Total number of labels
-    assert(pImpl->cardSigma == pImpl->alphabetMap.size());
+    // assert(pImpl->cardSigma == pImpl->alphabetMap.size());
     pImpl->cardSigmaN = cardSigmaN;
     pImpl->maxNumDigits = maxNumDigits;
 
@@ -278,12 +281,12 @@ std::vector<unsigned int> XBWT<T>::upwardStableSortConstruction(const LabeledTre
     std::vector<Triplet<unsigned int, int, int>> localIntNodes;
     if (intNodes == nullptr)
     {
-        localIntNodes = computeIntNodes(*tree.getRoot(), true);
+        localIntNodes = computeIntNodes<T>(*tree.getRoot(), true);
         intNodes = &localIntNodes;
     }
     else
     {
-        *intNodes = computeIntNodes(*tree.getRoot(), true);
+        *intNodes = computeIntNodes<T>(*tree.getRoot(), true);
     }
 
     std::vector<std::pair<unsigned int, std::string>> intNodesPaths;
@@ -343,7 +346,15 @@ std::vector<Triplet<unsigned int, int, int>> XBWT<T>::computeIntNodes(const Node
         auto [node, cur_level, parent_index] = stack.top();
         stack.pop();
 
-        T label = (encode ? pImpl->alphabetMap[node->getLabel()] : node->getLabel());
+        U label = node->getLabel();
+        if (encode) {
+            if (node->isLeaf()) {
+                label = pImpl->alphabetMapLeaves[node->getLabel()];
+            } else {
+                label = pImpl->alphabetMap[node->getLabel()];
+            }
+        }
+
         intNodes.push_back(Triplet<unsigned int, int, int>(label, cur_level, parent_index));
 
         // update level and parent index
@@ -666,10 +677,10 @@ std::vector<unsigned int> XBWT<T>::pathSortMerge(std::vector<unsigned int> &intN
         merged.erase(merged.begin());
     }
 
-    /* std::cout << "Merged: " << std::endl;
+    std::cout << "Merged: " << std::endl;
     for (unsigned int i = 0; i < merged.size(); ++i)
         std::cout << merged[i] << " ";
-    std::cout << std::endl; */
+    std::cout << std::endl;
 
     return merged;
 }
@@ -838,9 +849,9 @@ std::vector<unsigned int> XBWT<T>::pathSort(const std::vector<Triplet<unsigned i
                 std::string aStr = a.second.substr(maxNumDigits);
                 std::string bStr = b.second.substr(maxNumDigits);
 
-                return aStr < bStr; 
-            } 
-            else 
+                return aStr < bStr;
+            }
+            else
             {
                 return a.second.substr(0, maxNumDigits) < b.second.substr(0, maxNumDigits);
             } });
@@ -993,7 +1004,7 @@ template <typename T>
 void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verbose, std::vector<unsigned int> *intNodesPosSorted)
 {
     std::vector<unsigned int> posIntNodesSorted;
-    std::vector<Triplet<unsigned int, int, int>> intNodes = computeIntNodes(*tree.getRoot(), true);
+    std::vector<Triplet<unsigned int, int, int>> intNodes = computeIntNodes<T>(*tree.getRoot(), true);
     if (usePathSort)
         posIntNodesSorted = pathSort(intNodes, false, true, 0, false, pImpl->maxNumDigits);
     else
@@ -1080,7 +1091,7 @@ void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verb
         // build wt_int with non compressed bit vectors
         sdsl::wt_int<> wt;
         sdsl::construct_im(wt, tempSAlpha);
-        std::cout << "SAlpha wt size: " << sdsl::size_in_bytes(wt) << " B" << std::endl;        
+        std::cout << "SAlpha wt size: " << sdsl::size_in_bytes(wt) << " B" << std::endl;
 
         std::cout << "SLast size: " << sdsl::size_in_bytes(SLast) << " B" << std::endl;
         std::cout << "SLast compressed size: " << sdsl::size_in_bytes(pImpl->SLastCompressed) << " B" << std::endl;
@@ -1092,7 +1103,7 @@ void XBWT<T>::createXBWT(const LabeledTree<T> &tree, bool usePathSort, bool verb
         std::cout << "A compressed size: " << sdsl::size_in_bytes(pImpl->ACompressed) << " B" << std::endl;
         std::cout << "SigmaN size: " << sdsl::size_in_bytes(SigmaN) << " B" << std::endl;
         std::cout << "SigmaN compressed size: " << sdsl::size_in_bytes(pImpl->SigmaNCompressed) << " B" << std::endl;
-    
+
         // Compute and print compression ratio
         double originalSize = sdsl::size_in_bytes(wt) + sdsl::size_in_bytes(SAlphaBit);
         double compressedSize = sdsl::size_in_bytes(pImpl->SLastCompressed) + sdsl::size_in_bytes(pImpl->SAlphaCompressed) + sdsl::size_in_bytes(pImpl->SAlphaBitCompressed) + sdsl::size_in_bytes(pImpl->ACompressed);
@@ -1198,7 +1209,7 @@ LabeledTree<T> XBWT<T>::rebuildTree() const
     }
     std::cout << std::endl; */
 
-    Node<T> *root = new Node<T>(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[0]]);
+    Node<T> *root = new Node<T>(pImpl->SAlphaBitCompressed[0] ? pImpl->alphabetMapLeavesInv[pImpl->SAlphaCompressed[0]] : pImpl->alphabetMapInv[pImpl->SAlphaCompressed[0]]);
     std::stack<std::pair<unsigned int, Node<T> *>> Q;
     Q.push({0, root});
     while (!Q.empty())
@@ -1216,7 +1227,7 @@ LabeledTree<T> XBWT<T>::rebuildTree() const
 
         for (unsigned int h = j1; h >= j; --h)
         {
-            Node<T> *v = new Node<T>(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[h]]);
+            Node<T> *v = new Node<T>(pImpl->SAlphaBitCompressed[h] ? pImpl->alphabetMapLeavesInv[pImpl->SAlphaCompressed[h]] : pImpl->alphabetMapInv[pImpl->SAlphaCompressed[h]]);
             u->prependChild(v);
             Q.push({h, v});
         }
@@ -1428,7 +1439,11 @@ std::vector<T> XBWT<T>::getSubtree(unsigned int i, unsigned int order) const
         {
             unsigned int node = stack.top();
             stack.pop();
-            subtree.push_back(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[node]]);
+            if (pImpl->SAlphaBitCompressed[node]) {
+                subtree.push_back(pImpl->alphabetMapLeavesInv[pImpl->SAlphaCompressed[node]]);
+            } else {
+                subtree.push_back(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[node]]);
+            }   
 
             auto [first, last] = getChildren(node);
             for (unsigned int j = last; j >= first && j != static_cast<unsigned int>(-1); --j)
@@ -1455,7 +1470,11 @@ std::vector<T> XBWT<T>::getSubtree(unsigned int i, unsigned int order) const
 
         while (!output.empty())
         {
-            subtree.push_back(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[output.top()]]);
+            if (pImpl->SAlphaBitCompressed[output.top()]) {
+                subtree.push_back(pImpl->alphabetMapLeavesInv[pImpl->SAlphaCompressed[output.top()]]);
+            } else {
+                subtree.push_back(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[output.top()]]);
+            }
             output.pop();
         }
     }
@@ -1472,7 +1491,11 @@ std::vector<T> XBWT<T>::getSubtree(unsigned int i, unsigned int order) const
 
             if (visited)
             {
-                subtree.push_back(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[node]]);
+                if (pImpl->SAlphaBitCompressed[node]) {
+                    subtree.push_back(pImpl->alphabetMapLeavesInv[pImpl->SAlphaCompressed[node]]);
+                } else {
+                    subtree.push_back(pImpl->alphabetMapInv[pImpl->SAlphaCompressed[node]]);
+                }
             }
             else
             {

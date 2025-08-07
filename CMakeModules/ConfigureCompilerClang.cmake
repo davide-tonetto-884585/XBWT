@@ -13,7 +13,6 @@ add_compile_options("-Wall")
 add_compile_options("-Wextra")
 add_compile_options("-Wcomment")
 
-
 # Add the basic compiler options for debug version
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb3 -O0 -DDEBUG")
 # Add the basic compiler options for release version

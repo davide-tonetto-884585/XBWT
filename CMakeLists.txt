@@ -40,7 +40,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # using GCC
   message("compiler: configuring gcc compiler")
   include(ConfigureCompilerGcc)
-else ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+else()
   message(FATAL_ERROR "Only the compiler gcc and clang are supported")
 endif()
 
