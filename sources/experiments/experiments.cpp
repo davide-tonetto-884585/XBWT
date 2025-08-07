@@ -50,11 +50,11 @@ int main(int argc, char* argv[])
          << chrono::duration_cast<chrono::microseconds>(end - start).count()
          << " micro s" << endl;
 
-    cout << "Number of nodes: " << tree.getNodes().size() << endl;
-    cout << "Depth of the tree: " << tree.getDepth() << endl;
+    cout << "Number of nodes: " << tree.get_nodes().size() << endl;
+    cout << "Depth of the tree: " << tree.get_depth() << endl;
 
     if (verbose)
-        cout << "Tree: " << tree.toString() << endl;
+        cout << "Tree: " << tree.to_string() << endl;
 
     // build an XBWT
     vector<unsigned int> intNodesPosSorted{};
@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
     XBWT<unsigned int> xbwt(tree, true, verbose, &intNodesPosSorted);
     XBWT<unsigned int> xbwt2(tree, false, false, &testIntNodesPosSorted);
     cout << endl
-         << "Cardinality of the alphabet: " << xbwt.getCardSigma() << endl;
+         << "Cardinality of the alphabet: " << xbwt.get_card_sigma() << endl;
     cout << "String size: " << str.size() << endl;
 
     cout << "\n______________________________________________________\n"
